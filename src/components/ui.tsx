@@ -1,6 +1,8 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
 
+import { translator, useT } from "../i18n";
+
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
@@ -75,10 +77,10 @@ function parseNumber(text: string): number | null {
 }
 
 function formatNumber(n: number): string {
-  return String(Math.round(n * 100) / 100).replace(".", ",");
+  return translator().number(n, 2);
 }
 
-/** Accepts German decimal commas; commits on blur or Enter so typing is never interrupted. */
+/** Accepts both decimal commas and points; commits on blur or Enter so typing is never interrupted. */
 export function NumberInput({
   value,
   onChange,
@@ -94,8 +96,10 @@ export function NumberInput({
   max?: number;
   step?: number;
 }) {
+  // Re-format when the language (and with it the decimal separator) changes.
+  const { language } = useT();
   const [text, setText] = useState(formatNumber(value));
-  useEffect(() => setText(formatNumber(value)), [value]);
+  useEffect(() => setText(formatNumber(value)), [value, language]);
 
   const commit = (raw: string) => {
     let n = parseNumber(raw);
