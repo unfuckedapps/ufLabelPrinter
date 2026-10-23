@@ -109,12 +109,8 @@ impl Connection {
             (Connection::Serial { path }, Some(d)) => {
                 serial::exchange(path, &d.request(), STATUS_TIMEOUT, |r| d.is_complete(r))?
             }
-            (Connection::Ble { id, name }, Some(d)) => {
-                ble::exchange(id, name, &d.request(), STATUS_TIMEOUT, |r| d.is_complete(r))?
-            }
-            (Connection::Ble { id, name }, None) => {
-                ble::probe(id, name)?;
-                return Ok(PrinterStatus::connected());
+            (Connection::Ble { id, name }, dialect) => {
+                return ble::status(id, name, dialect, STATUS_TIMEOUT);
             }
             (Connection::Serial { .. } | Connection::Cups { .. }, _) => {
                 return Ok(PrinterStatus::default());

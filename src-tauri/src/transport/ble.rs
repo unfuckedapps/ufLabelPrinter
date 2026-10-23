@@ -23,6 +23,7 @@ use uuid::Uuid;
 
 use super::Progress;
 use crate::error::{Error, Result};
+use crate::status::{PrinterStatus, StatusDialect};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -370,18 +371,38 @@ async fn connect(id: &str, name: &str) -> Result<Link> {
         peripheral.mtu()
     );
 
+    // Some firmwares answer on a different channel than the one paired with the write
+    // characteristic; listen to every vendor notify characteristic and log who talks.
+    let extra: Vec<Characteristic> = chars
+        .iter()
+        .filter(|c| {
+            c.properties.intersects(CharPropFlags::NOTIFY | CharPropFlags::INDICATE)
+                && !is_standard_service(c.service_uuid)
+                && Some(c.uuid) != notify.as_ref().map(|n| n.uuid)
+        })
+        .cloned()
+        .collect();
+
     let flow = Arc::new(Flow::default());
     let mut listener = None;
     if let Some(notify) = notify {
         // Subscribing first: the printer announces its credits as soon as it may talk.
         let mut stream = peripheral.notifications().await.map_err(ble_err)?;
         peripheral.subscribe(&notify).await.map_err(ble_err)?;
+        for c in &extra {
+            if let Err(err) = peripheral.subscribe(c).await {
+                log::debug!("{name}: cannot subscribe to {}: {err}", c.uuid);
+            }
+        }
         let (flow_rx, label) = (flow.clone(), name.to_owned());
         listener = Some(tauri::async_runtime::spawn(async move {
             while let Some(n) = stream.next().await {
                 if n.uuid == notify.uuid {
                     log::debug!("{label}: notify {}", hex(&n.value));
                     flow_rx.handle(&n.value);
+                } else {
+                    log::debug!("{label}: notify on {}: {} {:?}", n.uuid, hex(&n.value), String::from_utf8_lossy(&n.value));
+                    flow_rx.replies.lock().unwrap_or_else(|p| p.into_inner()).extend_from_slice(&n.value);
                 }
             }
         }));
@@ -533,10 +554,71 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
 
 /// Connects and disconnects again: for printers without known status queries this at
 /// least proves the printer is in range, and logs its characteristics.
-pub fn probe(id: &str, name: &str) -> Result<()> {
+/// Standard GATT Device Information: model number, firmware, software revision.
+const DIS_MODEL: Uuid = uuid16(0x2a24);
+const DIS_FIRMWARE: Uuid = uuid16(0x2a26);
+const DIS_SOFTWARE: Uuid = uuid16(0x2a28);
+
+#[derive(Debug, Default)]
+pub struct DeviceInfo {
+    pub model: Option<String>,
+    pub firmware: Option<String>,
+}
+
+impl Link {
+    async fn read_string(&self, uuid: Uuid) -> Option<String> {
+        let c = self
+            .peripheral
+            .characteristics()
+            .into_iter()
+            .find(|c| c.uuid == uuid && c.properties.contains(CharPropFlags::READ))?;
+        let value = tokio::time::timeout(Duration::from_secs(2), self.peripheral.read(&c))
+            .await
+            .ok()?
+            .ok()?;
+        let text = String::from_utf8_lossy(&value).trim_matches(|c: char| c == '\0' || c.is_whitespace()).to_owned();
+        (!text.is_empty()).then_some(text)
+    }
+
+    /// Many printers (the Vevor Y468BT for one) expose the standard Device Information
+    /// service; the vendor apps read their firmware version from there.
+    async fn device_info(&self) -> DeviceInfo {
+        let info = DeviceInfo {
+            model: self.read_string(DIS_MODEL).await,
+            firmware: match self.read_string(DIS_FIRMWARE).await {
+                Some(firmware) => Some(firmware),
+                None => self.read_string(DIS_SOFTWARE).await,
+            },
+        };
+        log::debug!("{}: device information {info:?}", self.name);
+        info
+    }
+}
+
+/// Connects once, runs the dialect's queries (if any) and fills gaps in the answer from
+/// the standard Device Information service.
+pub fn status(
+    id: &str,
+    name: &str,
+    dialect: Option<&dyn StatusDialect>,
+    timeout: Duration,
+) -> Result<PrinterStatus> {
     block_on(async {
-        connect(id, name).await?.close().await;
-        Ok(())
+        let link = connect(id, name).await?;
+        let info = link.device_info().await;
+        let reply = match dialect {
+            Some(d) => exchange_on(&link, &d.request(), timeout, |r| d.is_complete(r)).await,
+            None => Ok(Vec::new()),
+        };
+        link.close().await;
+
+        let reply = reply?;
+        let mut status = dialect.map_or_else(PrinterStatus::connected, |d| d.parse(&reply));
+        status.connected = true;
+        status.responsive |= info.model.is_some() || info.firmware.is_some();
+        status.model = status.model.or(info.model);
+        status.firmware = status.firmware.or(info.firmware);
+        Ok(status)
     })
 }
 
