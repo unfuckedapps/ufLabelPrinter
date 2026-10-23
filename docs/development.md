@@ -100,3 +100,6 @@ repository has to be public for that.
 
 Without the Apple secrets the macOS build is unsigned; without the signing key no update
 files are produced. `scripts/set-release-secrets.sh` uploads them with the GitHub CLI.
+Tauri signs with the first identity in the certificate file, so the script repacks the
+`.p12` to just the Developer ID Application identity; `scripts/set-release-secrets.sh apple`
+renews only the certificate.
