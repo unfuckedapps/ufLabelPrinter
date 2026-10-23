@@ -63,6 +63,18 @@ PDF / image ──► pdf.js renders at the printer's dpi ──► fit, rotate,
 - **Linux** needs read/write access to the printer's USB device (a udev rule) and BlueZ
   for Bluetooth.
 
+### Opening files from outside the app
+
+PDFs reach the app through the file association in `tauri.conf.json` (*Open With*, double
+click) on every platform, and on macOS also through the Share menu. Either way they land in
+`open_files` (`src-tauri/src/lib.rs`), which queues them for the UI.
+
+The Share menu entry is an app extension in `src-tauri/share-extension/` (Swift, no UI) that
+hands the shared PDFs to the app via Launch Services. `scripts/build-share-extension.mjs`
+builds it before bundling and signs it with `APPLE_SIGNING_IDENTITY` (ad hoc without one),
+because Tauri does not sign bundles nested in the app. `tauri dev` has no extension; to try
+it, build the app bundle, start it once, then enable it under *Share → Edit Extensions…*.
+
 ### Poking at hardware
 
 `cargo run --example probe` lists USB printers and reads their status without printing.

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "pdfjs-assets": "node scripts/copy-pdfjs-assets.mjs",
+    "share-extension": "node scripts/build-share-extension.mjs",
     "dev": "pnpm pdfjs-assets && vite",
     "build": "pnpm pdfjs-assets && tsc && vite build",
     "preview": "vite preview",

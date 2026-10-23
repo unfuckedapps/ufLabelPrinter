@@ -50,7 +50,9 @@ Grab the latest version from the
      **Add**. The app asks once for permission to use Bluetooth.
 2. **Tell it what paper is loaded.** Open **Paper**, pick the size (for example
    4 × 6" shipping labels) and choose it in the top right corner.
-3. **Print.** Drag your label PDF into the window and press **Print**.
+3. **Print.** Drag your label PDF into the window and press **Print**. You can also
+   right-click the PDF and choose **Open With → ufLabelPrinter**, or on macOS
+   **Share → ufLabelPrinter**.
 
 Print the **Test label** from the printer page once: if the frame sits exactly on the
 label edge, everything is set up right.
@@ -77,6 +79,9 @@ and tell us how it went, so it can be recognised automatically.
   printer. Close it and try again.
 - **Bluetooth printer not found.** Make sure it is switched on and not connected to your
   phone; these printers only talk to one device at a time.
+- **ufLabelPrinter is missing from the Share menu (macOS).** Start the app once after
+  installing, then choose **Edit Extensions…** at the bottom of the Share menu and switch
+  it on.
 - **Windows and USB.** Windows locks USB printers to its own driver. Use Bluetooth, or add
   the printer in Windows with the *Generic / Text Only* driver and pick it under
   *Show unrecognised devices*.
