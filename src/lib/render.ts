@@ -223,12 +223,17 @@ export function renderTestLabel(printer: Printer): Bitmap {
   ctx.strokeRect(inset, inset, width - 2 * inset, height - 2 * inset);
   ctx.setLineDash([]);
 
-  ctx.beginPath();
-  ctx.moveTo(width / 2 - 5 * dpmm, height / 2);
-  ctx.lineTo(width / 2 + 5 * dpmm, height / 2);
-  ctx.moveTo(width / 2, height / 2 - 5 * dpmm);
-  ctx.lineTo(width / 2, height / 2 + 5 * dpmm);
-  ctx.stroke();
+  // Small labels (57 × 32 mm and the like) get a denser layout without the centre cross,
+  // which would run into the text.
+  const compact = height / dpmm < 50;
+  if (!compact) {
+    ctx.beginPath();
+    ctx.moveTo(width / 2 - 5 * dpmm, height / 2);
+    ctx.lineTo(width / 2 + 5 * dpmm, height / 2);
+    ctx.moveTo(width / 2, height / 2 - 5 * dpmm);
+    ctx.lineTo(width / 2, height / 2 + 5 * dpmm);
+    ctx.stroke();
+  }
 
   // Millimetre rulers along the top and left edge, every 10 mm labelled.
   ctx.lineWidth = Math.max(1, Math.round(dpmm * 0.15));
@@ -251,29 +256,37 @@ export function renderTestLabel(printer: Printer): Bitmap {
     if (mm % 10 === 0 && mm > 0) ctx.fillText(String(mm), inset + 4.6 * dpmm, mm * dpmm - 1 * dpmm);
   }
 
-  // Solid block and 1/2/3-dot line pairs to judge darkness: lines should stay separate,
-  // the block should be evenly black.
-  const patternY = Math.round(height / 2 + 10 * dpmm);
-  const patternH = Math.round(6 * dpmm);
-  let px = Math.round(10 * dpmm);
-  ctx.fillRect(px, patternY, Math.round(10 * dpmm), patternH);
-  px += Math.round(14 * dpmm);
-  for (const dots of [1, 2, 3]) {
-    for (let i = 0; i < 12; i++, px += 2 * dots) ctx.fillRect(px, patternY, dots, patternH);
-    px += Math.round(4 * dpmm);
-  }
-
+  // Text block: below the top ruler on small labels, above the centre on large ones.
+  const t = translator();
+  const density = printer.density ?? t("testLabel.printerDefault");
+  const titleMm = compact ? 2.8 : 4;
+  const bodyMm = compact ? 2.2 : 3;
+  const lines: [string, number, boolean][] = [
+    [printer.name, titleMm, true],
+    ...(compact ? [] : [[printer.paper.name, bodyMm, false] as [string, number, boolean]]),
+    [`${paperSize(printer)} · ${printer.dpi} dpi`, bodyMm, false],
+    [t("testLabel.density", { value: density }), bodyMm, false],
+  ];
   ctx.fillStyle = "#000";
   ctx.textAlign = "center";
-  ctx.font = `600 ${Math.round(4 * dpmm)}px -apple-system, Helvetica, sans-serif`;
-  ctx.fillText(printer.name, width / 2, height / 2 - 18 * dpmm);
-  ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
-  ctx.fillText(printer.paper.name, width / 2, height / 2 - 23 * dpmm);
-  ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
-  const t = translator();
-  ctx.fillText(`${paperSize(printer)} · ${printer.dpi} dpi`, width / 2, height / 2 - 12 * dpmm);
-  const density = printer.density ?? t("testLabel.printerDefault");
-  ctx.fillText(t("testLabel.density", { value: density }), width / 2, height / 2 - 8 * dpmm);
+  let y = compact ? inset + 7 * dpmm : height / 2 - 24 * dpmm;
+  for (const [text, sizeMm, bold] of lines) {
+    ctx.font = `${bold ? "600 " : ""}${Math.round(sizeMm * dpmm)}px -apple-system, Helvetica, sans-serif`;
+    ctx.fillText(text, width / 2, y);
+    y += (sizeMm + 0.8) * dpmm;
+  }
+
+  // Solid block and 1/2/3-dot line pairs to judge darkness: lines should stay separate,
+  // the block should be evenly black.
+  const patternY = Math.round(compact ? y + 0.5 * dpmm : height / 2 + 10 * dpmm);
+  const patternH = Math.round(Math.max(1.5, Math.min(6, (height - patternY) / dpmm - 3)) * dpmm);
+  let px = Math.round((compact ? 5 : 10) * dpmm);
+  ctx.fillRect(px, patternY, Math.round((compact ? 6 : 10) * dpmm), patternH);
+  px += Math.round((compact ? 9 : 14) * dpmm);
+  for (const dots of [1, 2, 3]) {
+    for (let i = 0; i < 12; i++, px += 2 * dots) ctx.fillRect(px, patternY, dots, patternH);
+    px += Math.round((compact ? 2.5 : 4) * dpmm);
+  }
 
   return toBitmap(ctx.getImageData(0, 0, canvas.width, canvas.height), 128, false);
 }

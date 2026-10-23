@@ -14,10 +14,12 @@
     "widthMm": 101.6,
     "heightMm": 152.4,
     "mediaType": "gap",
-    "gapMm": 3
+    "gapMm": 3,
+    "density": 11,
+    "speed": 4
   },
-  "speeds": [2, 3, 4, 5, 6],
-  "density": { "min": 0, "max": 15 },
+  "speeds": [1, 2, 3, 4, 5, 6, 7],
+  "density": { "min": 1, "max": 15 },
   "compression": "lzo",
   "notes": "Shows up on USB as \"QIN LabelPrinter\". Ignores TSPL <ESC>!? but answers the SSS status queries Labelife uses."
 }

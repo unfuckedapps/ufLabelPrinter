@@ -6,6 +6,7 @@
   "dpi": 203,
   "maxWidthMm": 108,
   "match": {
+    "usb": [{ "vendorId": 22872, "productId": 1128 }],
     "bluetooth": ["Y468BT"]
   },
   "defaults": {
@@ -16,5 +17,5 @@
   },
   "speeds": [2, 3, 4, 5, 6],
   "density": { "min": 0, "max": 15 },
-  "notes": "The Vevor CUPS driver emits TSPL at 203 dpi. Status queries are not known yet."
+  "notes": "Shows up on USB as \"YXWL Y468BT\". The Vevor CUPS driver emits TSPL at 203 dpi (default gap 3 mm, darkness 8). Status queries are not known yet."
 }
