@@ -244,6 +244,7 @@ export const en = {
     usb: "USB error",
     sendTimeout: "The printer did not accept the data",
     portUnavailable: "{path} is not available – is the printer switched on and paired?",
+    connectFailed: "Could not connect to {path} via Bluetooth. Switch the printer off and on and make sure no phone is connected to it.",
     stalled: "Bluetooth transfer stalled at {sentKb} of {totalKb} KB – printer out of range or disconnected?",
     disconnected: "Bluetooth connection dropped after {sentKb} of {totalKb} KB",
     cancelled: "Printing cancelled",

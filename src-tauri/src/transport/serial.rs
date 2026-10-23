@@ -4,9 +4,14 @@
 //! Bluetooth links are slow (a few KB/s) and can stall when the printer stops reading,
 //! so jobs are written in small non-blocking chunks: progress can be reported, the job
 //! cancelled, and a stalled link detected instead of blocking in `write()` forever.
+//!
+//! Opening the port is where macOS sets up the RFCOMM link. When that fails the call
+//! can hang uninterruptibly in the kernel for minutes, so it runs on its own thread.
 
+use std::collections::BTreeSet;
 use std::io::{ErrorKind, Read, Write};
 use std::os::fd::AsRawFd;
+use std::sync::{Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -31,6 +36,13 @@ const CHUNK: usize = 512;
 /// No byte accepted for this long means the link is dead or the printer stopped reading.
 const STALL_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Establishing the Bluetooth link normally takes 1-3 s.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Ports whose open() is still stuck in the kernel; opening them again would only pile
+/// up more stuck threads.
+static CONNECTING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
 pub fn list() -> Result<Vec<SerialPortInfo>> {
     let mut ports: Vec<_> = std::fs::read_dir("/dev")?
         .filter_map(|entry| {
@@ -47,15 +59,30 @@ pub fn list() -> Result<Vec<SerialPortInfo>> {
 }
 
 fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
-    // The baud rate is meaningless for RFCOMM but required by the API.
-    let port = TTYPort::open(&serialport::new(path, 115_200).timeout(timeout)).map_err(|err| {
-        match err.kind() {
+    let connect_failed = || Error::ConnectFailed { path: path.to_owned() };
+    if !CONNECTING.lock().unwrap_or_else(|p| p.into_inner()).insert(path.to_owned()) {
+        return Err(connect_failed());
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let owned = path.to_owned();
+    std::thread::spawn(move || {
+        // The baud rate is meaningless for RFCOMM but required by the API.
+        let result = TTYPort::open(&serialport::new(&owned, 115_200).timeout(timeout));
+        CONNECTING.lock().unwrap_or_else(|p| p.into_inner()).remove(&owned);
+        // Nobody listens any more after a timeout; the port is then simply closed again.
+        let _ = tx.send(result);
+    });
+
+    let port = match rx.recv_timeout(CONNECT_TIMEOUT) {
+        Ok(result) => result.map_err(|err| match err.kind() {
             serialport::ErrorKind::NoDevice | serialport::ErrorKind::Io(ErrorKind::NotFound) => {
                 Error::PortUnavailable { path: path.to_owned() }
             }
             _ => Error::Other(format!("{path}: {err}")),
-        }
-    })?;
+        })?,
+        Err(_) => return Err(connect_failed()),
+    };
 
     // serialport leaves the descriptor blocking, so a full RFCOMM buffer would park us
     // inside write() with no way out. Non-blocking writes return early instead and the

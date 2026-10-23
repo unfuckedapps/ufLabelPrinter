@@ -22,6 +22,9 @@ pub enum Error {
     #[error("{path} is not available")]
     PortUnavailable { path: String },
 
+    #[error("could not establish a Bluetooth connection via {path}")]
+    ConnectFailed { path: String },
+
     #[error("Bluetooth transfer stalled at {sent} of {total} bytes")]
     Stalled { sent: usize, total: usize },
 
@@ -55,6 +58,7 @@ impl Error {
             Error::Usb(_) => "usb",
             Error::SendTimeout => "sendTimeout",
             Error::PortUnavailable { .. } => "portUnavailable",
+            Error::ConnectFailed { .. } => "connectFailed",
             Error::Stalled { .. } => "stalled",
             Error::Disconnected { .. } => "disconnected",
             Error::Cancelled => "cancelled",
@@ -91,7 +95,9 @@ impl Serialize for Error {
         map.serialize_entry("code", self.code())?;
         map.serialize_entry("detail", &self.to_string())?;
         match self {
-            Error::PortUnavailable { path } => map.serialize_entry("path", path)?,
+            Error::PortUnavailable { path } | Error::ConnectFailed { path } => {
+                map.serialize_entry("path", path)?
+            }
             Error::Stalled { sent, total } | Error::Disconnected { sent, total } => {
                 map.serialize_entry("sentKb", &sent.div_ceil(1024))?;
                 map.serialize_entry("totalKb", &total.div_ceil(1024))?;

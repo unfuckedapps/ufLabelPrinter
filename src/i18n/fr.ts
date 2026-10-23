@@ -244,6 +244,7 @@ export const fr: Dictionary = {
     usb: "Erreur USB",
     sendTimeout: "L’imprimante n’a pas accepté les données",
     portUnavailable: "{path} n’est pas disponible – l’imprimante est-elle allumée et appairée ?",
+    connectFailed: "Connexion Bluetooth impossible à {path}. Éteignez puis rallumez l’imprimante et vérifiez qu’aucun téléphone n’y est connecté.",
     stalled: "Transfert Bluetooth bloqué à {sentKb} sur {totalKb} Ko – imprimante hors de portée ou déconnectée ?",
     disconnected: "Connexion Bluetooth interrompue après {sentKb} sur {totalKb} Ko",
     cancelled: "Impression annulée",
