@@ -524,6 +524,15 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
     Ok(())
 }
 
+/// Connects and disconnects again: for printers without known status queries this at
+/// least proves the printer is in range, and logs its characteristics.
+pub fn probe(id: &str, name: &str) -> Result<()> {
+    block_on(async {
+        connect(id, name).await?.close().await;
+        Ok(())
+    })
+}
+
 /// See [`super::usb::UsbPrinter::exchange`]; replies arrive as notifications.
 pub fn exchange(
     id: &str,

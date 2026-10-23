@@ -95,8 +95,8 @@ impl Connection {
         }))
     }
 
-    /// Without a dialect only USB can tell whether the device is there; opening a
-    /// Bluetooth port would connect it, and CUPS queues are fire-and-forget.
+    /// Without a dialect USB and Bluetooth LE can still tell whether the device is there;
+    /// a Classic Bluetooth port would have to connect, and CUPS queues are fire-and-forget.
     pub fn status(&self, dialect: Option<&dyn StatusDialect>) -> Result<PrinterStatus> {
         let reply = match (self, dialect) {
             (Connection::Usb(sel), Some(d)) => {
@@ -112,7 +112,11 @@ impl Connection {
             (Connection::Ble { id, name }, Some(d)) => {
                 ble::exchange(id, name, &d.request(), STATUS_TIMEOUT, |r| d.is_complete(r))?
             }
-            (Connection::Serial { .. } | Connection::Ble { .. } | Connection::Cups { .. }, _) => {
+            (Connection::Ble { id, name }, None) => {
+                ble::probe(id, name)?;
+                return Ok(PrinterStatus::connected());
+            }
+            (Connection::Serial { .. } | Connection::Cups { .. }, _) => {
                 return Ok(PrinterStatus::default());
             }
         };
