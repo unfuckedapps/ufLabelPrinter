@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import { jobSettings } from "./printers";
-import type { AppConfig, Bitmap, Devices, ModelRegistry, PrinterProfile, PrinterStatus } from "./types";
+import type { AppConfig, Bitmap, Devices, ModelRegistry, Printer, PrinterProfile, PrinterStatus } from "./types";
 
 export const listModels = () => invoke<ModelRegistry>("list_models");
 
@@ -12,10 +12,10 @@ export const listDevices = () => invoke<Devices>("list_devices");
 export const printerStatus = (p: PrinterProfile) =>
   invoke<PrinterStatus>("printer_status", { connection: p.connection, modelId: p.modelId });
 
-export const feedLabel = (p: PrinterProfile) =>
+export const feedLabel = (p: Printer) =>
   invoke<void>("feed_label", { connection: p.connection, settings: jobSettings(p), modelId: p.modelId });
 
-export const calibrate = (p: PrinterProfile) =>
+export const calibrate = (p: Printer) =>
   invoke<void>("calibrate", { connection: p.connection, settings: jobSettings(p), modelId: p.modelId });
 
 export const loadConfig = () => invoke<AppConfig | null>("load_config");
@@ -38,7 +38,7 @@ export interface PrintPage {
  * Sends the job as one binary body: `u32 LE json length`, JSON metadata, then all
  * bitmaps back to back (see `commands::parse_job`).
  */
-export function printJob(printer: PrinterProfile, pages: PrintPage[]): Promise<void> {
+export function printJob(printer: Printer, pages: PrintPage[]): Promise<void> {
   const meta = new TextEncoder().encode(
     JSON.stringify({
       connection: printer.connection,

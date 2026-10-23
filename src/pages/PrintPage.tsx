@@ -7,7 +7,7 @@ import {
   FolderOpen,
   Minus,
   Plus,
-  Printer,
+  Printer as PrinterIcon,
   RotateCw,
   Scaling,
   Trash2,
@@ -23,7 +23,7 @@ import { useConfig } from "../lib/config";
 import { useDocuments, type LabelDocument } from "../lib/documents";
 import { renderLabel } from "../lib/render";
 import { useStatus } from "../lib/status";
-import type { LayoutOptions, PrinterProfile } from "../lib/types";
+import type { LayoutOptions, Printer } from "../lib/types";
 
 function labelCount(docs: LabelDocument[]): number {
   return docs.reduce((sum, d) => sum + d.source.pageCount * d.copies, 0);
@@ -205,7 +205,7 @@ export function PrintPage() {
   const selected = docs.filter((d) => d.selected);
 
   const print = useCallback(
-    async (printer: PrinterProfile, targets: LabelDocument[], mode: "all" | "current") => {
+    async (printer: Printer, targets: LabelDocument[], mode: "all" | "current") => {
       if (targets.length === 0) return;
       setPrinting(mode);
       status.setPrinting(printer.id, true);
@@ -277,7 +277,7 @@ export function PrintPage() {
         {!activePrinter ? (
           <div className="flex h-full items-center justify-center p-10 text-center">
             <div className="flex max-w-sm flex-col items-center gap-3">
-              <Printer className="size-8 text-faint" />
+              <PrinterIcon className="size-8 text-faint" />
               <p className="text-base font-semibold">Noch kein Drucker eingerichtet</p>
               <p className="text-muted">
                 Schließe den Drucker per USB an oder kopple ihn per Bluetooth und füge ihn dann hinzu.
@@ -308,7 +308,7 @@ export function PrintPage() {
           <Button
             variant="primary"
             size="lg"
-            icon={<Printer className="size-4.5" />}
+            icon={<PrinterIcon className="size-4.5" />}
             busy={printing === "all"}
             disabled={!activePrinter || selected.length === 0 || printing !== null}
             onClick={() => activePrinter && void print(activePrinter, selected, "all")}

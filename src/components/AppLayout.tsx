@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FileDown, Printer, RefreshCw, Settings2 } from "lucide-react";
+import { FileDown, Printer, RefreshCw, ScrollText, Settings2 } from "lucide-react";
 
 import { takePendingFiles } from "../lib/api";
 import { useConfig } from "../lib/config";
@@ -63,8 +63,11 @@ function useFileIntake(): boolean {
   return dragging;
 }
 
+const PICKER =
+  "h-7 max-w-52 truncate rounded-md border border-line bg-panel px-2 text-xs font-medium outline-none focus:border-accent";
+
 function PrinterPicker() {
-  const { config, activePrinter, setActivePrinter } = useConfig();
+  const { config, printers, activePrinter, setActivePrinter, updatePrinter } = useConfig();
   const status = useStatus();
 
   if (!activePrinter) {
@@ -90,13 +93,26 @@ function PrinterPicker() {
         {entry.checking && <RefreshCw className="size-3 animate-spin" />}
       </button>
       <select
-        className="h-7 max-w-56 rounded-md border border-line bg-panel px-2 text-xs font-medium outline-none focus:border-accent"
+        className={PICKER}
+        title="Aktiver Drucker"
         value={activePrinter.id}
         onChange={(e) => setActivePrinter(e.target.value)}
       >
-        {config.printers.map((p) => (
+        {printers.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name} · {connectionKind(p.connection)}
+          </option>
+        ))}
+      </select>
+      <select
+        className={PICKER}
+        title="Eingelegtes Papier"
+        value={activePrinter.paperId}
+        onChange={(e) => updatePrinter(activePrinter.id, { paperId: e.target.value })}
+      >
+        {config.papers.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
           </option>
         ))}
       </select>
@@ -139,6 +155,9 @@ export function AppLayout() {
           </Tab>
           <Tab to="/drucker" icon={<Settings2 className="size-3.5" />}>
             Drucker
+          </Tab>
+          <Tab to="/papier" icon={<ScrollText className="size-3.5" />}>
+            Papier
           </Tab>
         </nav>
         <div className="flex-1" />

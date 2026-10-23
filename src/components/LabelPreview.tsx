@@ -5,7 +5,7 @@ import { drawBitmap } from "../lib/bitmap";
 import type { LabelDocument } from "../lib/documents";
 import { formatMm } from "../lib/printers";
 import { renderLabel, type RenderedLabel } from "../lib/render";
-import type { LayoutOptions, PrinterProfile } from "../lib/types";
+import type { LayoutOptions, Printer } from "../lib/types";
 import { errorMessage } from "../lib/api";
 
 /** Below this, small text and barcode modules get hard to print and scan. */
@@ -21,7 +21,7 @@ export function LabelPreview({
   doc: LabelDocument;
   page: number;
   onPageChange: (page: number) => void;
-  printer: PrinterProfile;
+  printer: Printer;
   layout: LayoutOptions;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

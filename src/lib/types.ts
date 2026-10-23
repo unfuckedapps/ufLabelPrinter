@@ -6,6 +6,19 @@ export type Connection =
 /** How the printer finds the start of the next label. */
 export type MediaType = "gap" | "blackMark" | "continuous";
 
+/** A kind of label roll; printers point at the one currently loaded. */
+export interface PaperProfile {
+  id: string;
+  name: string;
+  widthMm: number;
+  /** Label height, or the cut length for continuous paper. */
+  heightMm: number;
+  mediaType: MediaType;
+  /** Gap height, or black mark height for `blackMark`. */
+  gapMm: number;
+  gapOffsetMm: number;
+}
+
 export interface PrinterProfile {
   id: string;
   name: string;
@@ -13,12 +26,8 @@ export interface PrinterProfile {
   modelId: string;
   connection: Connection;
   dpi: number;
-  widthMm: number;
-  heightMm: number;
-  mediaType: MediaType;
-  /** Gap height, or black mark height for `blackMark`. */
-  gapMm: number;
-  gapOffsetMm: number;
+  /** The paper currently loaded. */
+  paperId: string;
   /** 0–15, `null` keeps the printer's own setting. */
   density: number | null;
   /** Inches per second, `null` keeps the printer's own setting. */
@@ -45,9 +54,13 @@ export interface LayoutOptions {
   dither: boolean;
 }
 
+/** A printer with its loaded paper resolved; what rendering and printing work with. */
+export type Printer = PrinterProfile & Omit<PaperProfile, "id" | "name"> & { paper: PaperProfile };
+
 export interface AppConfig {
-  version: 1;
+  version: 2;
   printers: PrinterProfile[];
+  papers: PaperProfile[];
   activePrinterId: string | null;
   layout: LayoutOptions;
 }

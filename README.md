@@ -26,8 +26,8 @@ itself and talks to the printer directly over **USB**, **Bluetooth** or, if you 
 - **Barcodes stay scannable.** Rendering uses a hard threshold at the printer's native
   dpi instead of fuzzy scaling. In testing, DHL Leitcode/Identcode and Warenpost UPU S10
   barcodes shrunk to 80 % still decoded at both 300 and 203 dpi.
-- **It supports the common media types:** die-cut labels with gaps, black-mark paper
-  and continuous rolls.
+- **Paper profiles:** describe each label roll once (size, gap/black-mark/continuous) and
+  switch the loaded paper from the toolbar when you change the roll.
 - **There are printer tools built in:** a calibration test label (edge frame, rulers,
   line patterns), label feed, sensor calibration, density, speed, 180° flip and
   fine offsets.

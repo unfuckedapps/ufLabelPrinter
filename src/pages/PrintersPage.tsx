@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import {
   Bluetooth,
   Cable,
@@ -20,17 +21,16 @@ import { Button, Field, NumberInput, Section, Segmented, Select, StatusDot, Text
 import { calibrate, errorMessage, feedLabel, listDevices, openModelsDir, printJob } from "../lib/api";
 import { useConfig } from "../lib/config";
 import {
-  MEDIA_TYPES,
-  PAPER_PRESETS,
   describeConnection,
+  formatMm,
   genericModelId,
   modelLabel,
-  newPrinter,
+  paperSummary,
   sameConnection,
 } from "../lib/printers";
 import { renderTestLabel } from "../lib/render";
 import { summarize, useStatus } from "../lib/status";
-import type { Connection, Devices, ModelRegistry, PrinterModel, PrinterProfile } from "../lib/types";
+import type { Connection, Devices, ModelRegistry, Printer, PrinterModel, PrinterProfile } from "../lib/types";
 
 function ConnectionIcon({ connection, className = "size-4" }: { connection: Connection; className?: string }) {
   if (connection.type === "usb") return <Cable className={className} />;
@@ -80,11 +80,11 @@ function candidates(devices: Devices, registry: ModelRegistry): Candidate[] {
 }
 
 function DeviceFinder() {
-  const { config, models, addPrinter } = useConfig();
+  const { config, models, createPrinter } = useConfig();
   const toast = useToast();
   const [devices, setDevices] = useState<Devices | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showCups, setShowCups] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const scan = useCallback(async () => {
     setLoading(true);
@@ -102,7 +102,9 @@ function DeviceFinder() {
   const found = devices
     ? candidates(devices, models).filter(
         (c) =>
-          (showCups || c.connection.type !== "cups") &&
+          // USB printer-class devices are printers by definition; serial ports and CUPS
+          // queues can be anything, so only recognised ones are offered by default.
+          (showAll || c.connection.type === "usb" || c.recognised) &&
           !config.printers.some((p) => sameConnection(p.connection, c.connection)),
       )
     : [];
@@ -135,7 +137,7 @@ function DeviceFinder() {
               disabled={!c.model}
               onClick={() => {
                 if (!c.model) return;
-                addPrinter(newPrinter(c.name, c.connection, c.model));
+                createPrinter(c.name, c.connection, c.model);
                 toast.success(`${c.name} hinzugefügt`);
               }}
             >
@@ -145,15 +147,15 @@ function DeviceFinder() {
         ))}
         {devices && found.length === 0 && (
           <li className="px-1 text-xs leading-relaxed text-faint">
-            Keine weiteren Geräte gefunden. Bluetooth-Drucker zuerst in den Systemeinstellungen koppeln.
+            Keine weiteren Drucker gefunden. Bluetooth-Drucker zuerst in den Systemeinstellungen koppeln.
           </li>
         )}
       </ul>
       <Toggle
-        checked={showCups}
-        onChange={setShowCups}
-        label="CUPS-Warteschlangen anzeigen"
-        hint="Nur für Drucker, die weder per USB noch per Bluetooth erreichbar sind."
+        checked={showAll}
+        onChange={setShowAll}
+        label="Nicht erkannte Geräte anzeigen"
+        hint="Alle Bluetooth-Ports und CUPS-Warteschlangen – für Drucker ohne Modelldatei."
       />
     </Section>
   );
@@ -202,7 +204,7 @@ function ModelLibrary() {
   );
 }
 
-function PrinterEditor({ printer }: { printer: PrinterProfile }) {
+function PrinterEditor({ printer }: { printer: Printer }) {
   const { config, models, modelFor, updatePrinter, removePrinter, setActivePrinter } = useConfig();
   const status = useStatus();
   const toast = useToast();
@@ -224,12 +226,11 @@ function PrinterEditor({ printer }: { printer: PrinterProfile }) {
     }
   };
 
-  const preset = PAPER_PRESETS.find((p) => p.widthMm === printer.widthMm && p.heightMm === printer.heightMm);
   const entry = status.get(printer.id);
   const summary = summarize(printer, entry);
   const isActive = config.activePrinterId === printer.id;
-  const mediaHint = MEDIA_TYPES.find((m) => m.value === printer.mediaType)?.hint;
   const model = modelFor(printer);
+  const tooWide = model !== null && printer.widthMm > model.maxWidthMm;
   const speeds = model?.speeds.length ? model.speeds : [2, 3, 4, 5, 6];
   const density = model?.density ?? { min: 0, max: 15 };
 
@@ -307,52 +308,28 @@ function PrinterEditor({ printer }: { printer: PrinterProfile }) {
         </div>
       </Section>
 
-      <Section title="Papier">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Format" className="col-span-2">
-            <Select
-              value={preset?.id ?? "custom"}
-              onChange={(id) => {
-                const p = PAPER_PRESETS.find((x) => x.id === id);
-                if (p) set({ widthMm: p.widthMm, heightMm: p.heightMm });
-              }}
-              options={[
-                ...PAPER_PRESETS.map((p) => ({ value: p.id, label: p.label })),
-                ...(preset ? [] : [{ value: "custom", label: "Eigenes Format" }]),
-              ]}
-            />
-          </Field>
-          <Field label="Breite">
-            <NumberInput value={printer.widthMm} onChange={(widthMm) => set({ widthMm })} unit="mm" min={10} max={120} step={0.5} />
-          </Field>
-          <Field label={printer.mediaType === "continuous" ? "Länge pro Etikett" : "Höhe"}>
-            <NumberInput value={printer.heightMm} onChange={(heightMm) => set({ heightMm })} unit="mm" min={10} max={500} step={0.5} />
-          </Field>
-          <Field label="Papierart" hint={mediaHint} className="col-span-2">
-            <Segmented
-              value={printer.mediaType}
-              onChange={(mediaType) => set({ mediaType })}
-              options={MEDIA_TYPES.map((m) => ({ value: m.value, label: m.label }))}
-            />
-          </Field>
-          {printer.mediaType !== "continuous" && (
-            <>
-              <Field label={printer.mediaType === "gap" ? "Lückenhöhe" : "Markenhöhe"}>
-                <NumberInput value={printer.gapMm} onChange={(gapMm) => set({ gapMm })} unit="mm" min={0} max={20} step={0.5} />
-              </Field>
-              <Field label="Lückenversatz" hint="Meist 0">
-                <NumberInput
-                  value={printer.gapOffsetMm}
-                  onChange={(gapOffsetMm) => set({ gapOffsetMm })}
-                  unit="mm"
-                  min={-10}
-                  max={10}
-                  step={0.5}
-                />
-              </Field>
-            </>
-          )}
-        </div>
+      <Section
+        title="Papier"
+        aside={
+          <Link to="/papier" className="text-[11px] font-medium text-accent hover:underline">
+            Papier verwalten
+          </Link>
+        }
+      >
+        <Field
+          label="Eingelegtes Papier"
+          hint={
+            tooWide
+              ? `Breiter als der Druckkopf (${formatMm(model!.maxWidthMm)} mm) – rechts wird abgeschnitten.`
+              : paperSummary(printer.paper)
+          }
+        >
+          <Select
+            value={printer.paperId}
+            onChange={(paperId) => set({ paperId })}
+            options={config.papers.map((p) => ({ value: p.id, label: p.name }))}
+          />
+        </Field>
       </Section>
 
       <Section title="Druck">
@@ -485,13 +462,13 @@ function PrinterEditor({ printer }: { printer: PrinterProfile }) {
 }
 
 export function PrintersPage() {
-  const { config } = useConfig();
+  const { config, printers } = useConfig();
   const status = useStatus();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
-    config.printers.find((p) => p.id === selectedId) ??
-    config.printers.find((p) => p.id === config.activePrinterId) ??
-    config.printers[0] ??
+    printers.find((p) => p.id === selectedId) ??
+    printers.find((p) => p.id === config.activePrinterId) ??
+    printers[0] ??
     null;
 
   return (
@@ -499,7 +476,7 @@ export function PrintersPage() {
       <aside className="flex min-h-0 flex-col gap-8 overflow-y-auto border-r border-line p-4">
         <Section title="Eingerichtet">
           <ul className="flex flex-col gap-1">
-            {config.printers.map((p) => {
+            {printers.map((p) => {
               const summary = summarize(p, status.get(p.id));
               return (
                 <li key={p.id}>
@@ -518,7 +495,7 @@ export function PrintersPage() {
                         {config.activePrinterId === p.id && <CircleCheck className="size-3.5 text-accent" />}
                       </span>
                       <span className="truncate text-[11px] text-faint">
-                        {p.widthMm} × {p.heightMm} mm · {p.dpi} dpi
+                        {p.paper.name} · {p.dpi} dpi
                       </span>
                     </div>
                     <StatusDot tone={summary.tone} />
@@ -526,7 +503,7 @@ export function PrintersPage() {
                 </li>
               );
             })}
-            {config.printers.length === 0 && (
+            {printers.length === 0 && (
               <li className="px-1 text-xs text-faint">Noch keine Drucker. Unten ein Gerät hinzufügen.</li>
             )}
           </ul>

@@ -7,6 +7,7 @@ import { ConfigProvider } from "./lib/config";
 import { DocumentsProvider } from "./lib/documents";
 import { StatusProvider } from "./lib/status";
 import { NotFound } from "./pages/NotFound";
+import { PapersPage } from "./pages/PapersPage";
 import { PrintersPage } from "./pages/PrintersPage";
 import { PrintPage } from "./pages/PrintPage";
 
@@ -18,6 +19,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <PrintPage /> },
       { path: "drucker", element: <PrintersPage /> },
+      { path: "papier", element: <PapersPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

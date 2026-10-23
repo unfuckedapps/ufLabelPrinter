@@ -1,4 +1,13 @@
-import type { AppConfig, Connection, LayoutOptions, MediaType, PrinterModel, PrinterProfile } from "./types";
+import type {
+  AppConfig,
+  Connection,
+  LayoutOptions,
+  MediaType,
+  PaperProfile,
+  Printer,
+  PrinterModel,
+  PrinterProfile,
+} from "./types";
 
 export interface PaperPreset {
   id: string;
@@ -48,12 +57,89 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
   dither: false,
 };
 
+export const DEFAULT_PAPERS: PaperProfile[] = [
+  {
+    id: "paper-4x6",
+    name: 'Versandetikett 4 × 6"',
+    widthMm: 101.6,
+    heightMm: 152.4,
+    mediaType: "gap",
+    gapMm: 3,
+    gapOffsetMm: 0,
+  },
+];
+
 export const DEFAULT_CONFIG: AppConfig = {
-  version: 1,
+  version: 2,
   printers: [],
+  papers: DEFAULT_PAPERS,
   activePrinterId: null,
   layout: DEFAULT_LAYOUT,
 };
+
+export function newPaper(fields: Partial<Omit<PaperProfile, "id">> = {}): PaperProfile {
+  const paper = {
+    widthMm: 101.6,
+    heightMm: 152.4,
+    mediaType: "gap" as MediaType,
+    gapMm: 3,
+    gapOffsetMm: 0,
+    ...fields,
+  };
+  return { id: crypto.randomUUID(), name: fields.name ?? paperSize(paper), ...paper };
+}
+
+export function paperSize(p: Pick<PaperProfile, "widthMm" | "heightMm">): string {
+  return `${formatMm(p.widthMm)} × ${formatMm(p.heightMm)} mm`;
+}
+
+export function paperSummary(p: PaperProfile): string {
+  const media =
+    p.mediaType === "gap"
+      ? `Lücke ${formatMm(p.gapMm)} mm`
+      : p.mediaType === "blackMark"
+        ? `Marke ${formatMm(p.gapMm)} mm`
+        : "Endlos";
+  return `${paperSize(p)} · ${media}`;
+}
+
+type PaperShape = Omit<PaperProfile, "id" | "name">;
+
+function samePaper(a: PaperShape, b: PaperShape): boolean {
+  return (
+    a.widthMm === b.widthMm &&
+    a.heightMm === b.heightMm &&
+    a.mediaType === b.mediaType &&
+    a.gapMm === b.gapMm &&
+    a.gapOffsetMm === b.gapOffsetMm
+  );
+}
+
+/** Reuses a matching paper profile or appends a new one. */
+export function ensurePaper(papers: PaperProfile[], shape: PaperShape): { papers: PaperProfile[]; paperId: string } {
+  const existing = papers.find((p) => samePaper(p, shape));
+  if (existing) return { papers, paperId: existing.id };
+  const preset = PAPER_PRESETS.find((p) => p.widthMm === shape.widthMm && p.heightMm === shape.heightMm);
+  const paper = newPaper({ ...shape, name: preset?.label });
+  return { papers: [...papers, paper], paperId: paper.id };
+}
+
+export function modelPaper(model: PrinterModel): PaperShape {
+  const d = model.defaults;
+  return {
+    widthMm: d.widthMm ?? 101.6,
+    heightMm: d.heightMm ?? 152.4,
+    mediaType: d.mediaType ?? "gap",
+    gapMm: d.gapMm ?? 3,
+    gapOffsetMm: 0,
+  };
+}
+
+export function resolvePrinter(profile: PrinterProfile, papers: PaperProfile[]): Printer {
+  const paper = papers.find((p) => p.id === profile.paperId) ?? papers[0] ?? DEFAULT_PAPERS[0];
+  const { id: _id, name: _name, ...shape } = paper;
+  return { ...profile, ...shape, paper };
+}
 
 /** Fallback when a profile references a model file that no longer exists. */
 export function genericModelId(dpi: number): string {
@@ -64,7 +150,12 @@ export function modelLabel(m: PrinterModel): string {
   return `${m.vendor} ${m.name}`;
 }
 
-export function newPrinter(name: string, connection: Connection, model: PrinterModel): PrinterProfile {
+export function newPrinter(
+  name: string,
+  connection: Connection,
+  model: PrinterModel,
+  paperId: string,
+): PrinterProfile {
   const d = model.defaults;
   return {
     id: crypto.randomUUID(),
@@ -72,11 +163,7 @@ export function newPrinter(name: string, connection: Connection, model: PrinterM
     modelId: model.id,
     connection,
     dpi: model.dpi,
-    widthMm: d.widthMm ?? 101.6,
-    heightMm: d.heightMm ?? 152.4,
-    mediaType: d.mediaType ?? "gap",
-    gapMm: d.gapMm ?? 3,
-    gapOffsetMm: 0,
+    paperId,
     density: d.density ?? null,
     speed: d.speed ?? null,
     rotate180: false,
@@ -91,12 +178,12 @@ export function mmToDots(mm: number, dpi: number): number {
 }
 
 /** Label size in printer dots. */
-export function labelDots(p: PrinterProfile): { width: number; height: number } {
+export function labelDots(p: Printer): { width: number; height: number } {
   return { width: mmToDots(p.widthMm, p.dpi), height: mmToDots(p.heightMm, p.dpi) };
 }
 
-/** Matches `tspl::JobSettings` on the Rust side. */
-export function jobSettings(p: PrinterProfile) {
+/** Matches `protocol::JobSettings` on the Rust side. */
+export function jobSettings(p: Printer) {
   const media =
     p.mediaType === "gap"
       ? { type: "gap", gapMm: p.gapMm, offsetMm: p.gapOffsetMm }

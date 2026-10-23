@@ -5,7 +5,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { inkBounds, toBitmap } from "./bitmap";
 import { place, rotatedSize, type Box, type LabelGeometry, type Placement } from "./layout";
 import { labelDots, mmToDots } from "./printers";
-import type { Bitmap, LayoutOptions, PrinterProfile, Rotation } from "./types";
+import type { Bitmap, LayoutOptions, Printer, Rotation } from "./types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -162,7 +162,7 @@ export interface RenderedLabel {
 /** Renders a page onto the printer's label at printer resolution and converts it to 1 bit. */
 export async function renderLabel(
   page: SourcePage,
-  printer: PrinterProfile,
+  printer: Printer,
   options: LayoutOptions,
 ): Promise<RenderedLabel> {
   const { width, height } = labelDots(printer);
@@ -204,7 +204,7 @@ export async function renderLabel(
  * Calibration label: an outline exactly on the label edge, centre cross and millimetre
  * rulers show whether offsets, size and darkness are right.
  */
-export function renderTestLabel(printer: PrinterProfile): Bitmap {
+export function renderTestLabel(printer: Printer): Bitmap {
   const { width, height } = labelDots(printer);
   const dpmm = printer.dpi / 25.4;
   const { canvas, ctx } = whiteCanvas(width, height);
@@ -266,6 +266,8 @@ export function renderTestLabel(printer: PrinterProfile): Bitmap {
   ctx.textAlign = "center";
   ctx.font = `600 ${Math.round(4 * dpmm)}px -apple-system, Helvetica, sans-serif`;
   ctx.fillText(printer.name, width / 2, height / 2 - 18 * dpmm);
+  ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
+  ctx.fillText(printer.paper.name, width / 2, height / 2 - 23 * dpmm);
   ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
   const size = `${printer.widthMm} × ${printer.heightMm} mm · ${printer.dpi} dpi`;
   ctx.fillText(size.replace(/\./g, ","), width / 2, height / 2 - 12 * dpmm);
