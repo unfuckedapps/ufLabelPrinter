@@ -54,4 +54,4 @@ tauri-plugin-single-instance = "2"
 libc = "0.2"
 
 [target."cfg(windows)".dependencies]
-windows = { version = "0.61", features = ["Win32_Graphics_Printing", "Win32_Foundation"] }
+windows = { version = "0.61", features = ["Win32_Graphics_Printing", "Win32_Graphics_Gdi", "Win32_Foundation"] }

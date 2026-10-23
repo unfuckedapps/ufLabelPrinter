@@ -33,6 +33,7 @@ pub struct SerialPortInfo {
 }
 
 /// System ports that are never printers.
+#[cfg(target_os = "macos")]
 const IGNORED: [&str; 2] = ["Bluetooth-Incoming-Port", "debug-console"];
 
 /// Small enough that progress and cancellation stay responsive at Bluetooth speeds.
