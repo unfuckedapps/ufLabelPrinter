@@ -3,6 +3,7 @@
 //! To support another family, implement [`StatusDialect`] and register it in [`get`].
 
 pub mod phomemo;
+pub mod yxwl;
 
 use serde::Serialize;
 
@@ -17,6 +18,7 @@ pub trait StatusDialect: Send + Sync {
 pub fn get(id: &str) -> Option<&'static dyn StatusDialect> {
     match id {
         "phomemo" => Some(&phomemo::Phomemo),
+        "yxwl" => Some(&yxwl::Yxwl),
         _ => None,
     }
 }
