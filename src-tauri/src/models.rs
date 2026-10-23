@@ -211,7 +211,7 @@ mod tests {
         let registry = ModelRegistry::load(None);
         assert_eq!(registry.match_usb(11836, 22361).unwrap().id, "phomemo-d530-pro");
         assert_eq!(registry.match_bluetooth("D530Pro").unwrap().id, "phomemo-d530-pro");
-        assert_eq!(registry.match_bluetooth("Y468BT-4958").unwrap().id, "vevor-y468bt");
+        assert_eq!(registry.match_bluetooth("Y468BT-1A2B").unwrap().id, "vevor-y468bt");
         assert_eq!(registry.match_bluetooth("D530 Pro_3A6A").unwrap().id, "phomemo-d530-pro");
         assert!(registry.match_bluetooth("iPhone").is_none());
     }

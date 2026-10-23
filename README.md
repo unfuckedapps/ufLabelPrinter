@@ -129,3 +129,8 @@ cd src-tauri && cargo clippy --all-targets
 
 Contributions of model files, protocols (ESC/POS, ZPL, EPL, …) and status dialects are
 very welcome.
+
+## License
+
+[MIT](LICENSE). Printer and vendor names belong to their respective owners; this project
+is not affiliated with Phomemo, Vevor or any other manufacturer.

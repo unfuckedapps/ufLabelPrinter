@@ -3,6 +3,8 @@ name = "uflabelprinter"
 version = "0.1.0"
 description = "Print to cheap thermal label printers without the vendor bloatware"
 authors = ["unfuckedapps"]
+license = "MIT"
+repository = "https://github.com/unfuckedapps/ufLabelPrinter"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

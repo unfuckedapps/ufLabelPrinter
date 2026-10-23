@@ -5,7 +5,7 @@
 //! ```sh
 //! cargo run --example test_print -- usb 300                 # first USB printer
 //! cargo run --example test_print -- /dev/cu.D530Pro 300     # Bluetooth
-//! cargo run --example test_print -- /dev/cu.Y468BT-4958 203 50 30
+//! cargo run --example test_print -- /dev/cu.Y468BT-1A2B 203 50 30
 //! cargo run --example test_print -- /dev/cu.D530Pro 300 101.6 152.4 lzo
 //! ```
 //!
