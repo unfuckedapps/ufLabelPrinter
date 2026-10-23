@@ -30,7 +30,7 @@ export const en = {
   },
   connection: {
     usb: "USB",
-    serial: "Bluetooth",
+    serial: "Bluetooth Classic",
     ble: "Bluetooth LE",
     cups: "CUPS",
   },
@@ -87,7 +87,7 @@ export const en = {
     noPrinter: "No printer",
     sent: { one: "{count} label sent to {printer}", other: "{count} labels sent to {printer}" },
     failed: "Printing failed: {error}",
-    preparing: "Preparing …",
+    preparing: "Connecting to the printer …",
     sending: "Sending {percent} % · {sent} / {total} KB",
     cancel: "Cancel",
   },
@@ -131,6 +131,7 @@ export const en = {
       firmware: "{model} · firmware {firmware}",
       cupsNoStatus: "CUPS reports no device status",
       notQueried: "Not queried yet",
+      noAnswer: "Reachable, but the printer did not answer the status query",
       status: "Status",
       general: "General",
       name: "Name",
@@ -171,6 +172,7 @@ export const en = {
       calibrate: "Calibrate sensor",
       calibrateTitle: "Re-measures label and gap – feeds a few labels",
       calibrating: "Calibration started",
+      openLog: "Open log folder",
       toolsHint:
         "The test label shows a frame exactly on the label edge, rulers and line patterns. If the frame is off, adjust the fine tuning. Calibrate once after changing the roll.",
       confirmRemove: "Really remove “{name}”?",

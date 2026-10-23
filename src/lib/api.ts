@@ -18,6 +18,8 @@ export const listModels = () => invoke<ModelRegistry>("list_models");
 
 export const openModelsDir = () => invoke<void>("open_models_dir");
 
+export const openLogDir = () => invoke<void>("open_log_dir");
+
 export const listDevices = () => invoke<Devices>("list_devices");
 
 /** Takes a few seconds; may trigger the macOS Bluetooth permission prompt. */

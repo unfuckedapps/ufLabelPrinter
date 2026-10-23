@@ -27,7 +27,7 @@ export const fr: Dictionary = {
   },
   connection: {
     usb: "USB",
-    serial: "Bluetooth",
+    serial: "Bluetooth Classic",
     ble: "Bluetooth LE",
     cups: "CUPS",
   },
@@ -87,7 +87,7 @@ export const fr: Dictionary = {
       other: "{count} étiquettes envoyées à {printer}",
     },
     failed: "Échec de l’impression : {error}",
-    preparing: "Préparation …",
+    preparing: "Connexion à l’imprimante …",
     sending: "Envoi {percent} % · {sent} / {total} Ko",
     cancel: "Annuler",
   },
@@ -131,6 +131,7 @@ export const fr: Dictionary = {
       firmware: "{model} · micrologiciel {firmware}",
       cupsNoStatus: "CUPS ne fournit pas l’état de l’appareil",
       notQueried: "Pas encore interrogée",
+      noAnswer: "Joignable, mais l’imprimante n’a pas répondu à la demande d’état",
       status: "État",
       general: "Général",
       name: "Nom",
@@ -171,6 +172,7 @@ export const fr: Dictionary = {
       calibrate: "Calibrer le capteur",
       calibrateTitle: "Mesure à nouveau l’étiquette et l’espace – fait avancer quelques étiquettes",
       calibrating: "Calibrage lancé",
+      openLog: "Ouvrir le dossier des journaux",
       toolsHint:
         "L’étiquette de test montre un cadre exactement sur le bord de l’étiquette, des règles et des motifs de lignes. Si le cadre est décalé, corrigez avec le réglage fin. Calibrez une fois après chaque changement de rouleau.",
       confirmRemove: "Vraiment supprimer « {name} » ?",

@@ -85,6 +85,18 @@ pub fn list_models(app: AppHandle) -> ModelRegistry {
     fresh
 }
 
+/// Reveals the log file in Finder, for attaching it to bug reports.
+#[tauri::command]
+pub fn open_log_dir(app: AppHandle) -> Result<()> {
+    let dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|err| Error::Other(err.to_string()))?;
+    std::fs::create_dir_all(&dir)?;
+    std::process::Command::new("open").arg(&dir).spawn()?;
+    Ok(())
+}
+
 /// Opens the folder for custom model files in Finder, creating it on first use.
 #[tauri::command]
 pub fn open_models_dir(app: AppHandle) -> Result<()> {
@@ -344,6 +356,13 @@ pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
 
     let report = progress_reporter(app.clone(), meta.job_id.clone());
     let connection = meta.connection.clone();
+    log::info!(
+        "job {}: {} page(s), {} bytes to {connection:?} ({:?})",
+        meta.job_id,
+        pages.len(),
+        job.len(),
+        meta.settings.compression
+    );
     let result = with_device(&app, &connection, move |state| {
         // Cancelled while waiting for the device: nothing was sent yet.
         if cancel.load(Ordering::Relaxed) {
@@ -356,6 +375,10 @@ pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
     .await;
 
     locked(&state.jobs).remove(&meta.job_id);
+    match &result {
+        Ok(()) => log::info!("job {} sent", meta.job_id),
+        Err(err) => log::warn!("job {} failed: {err}", meta.job_id),
+    }
     result
 }
 

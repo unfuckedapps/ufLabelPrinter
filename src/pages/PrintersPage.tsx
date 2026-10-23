@@ -6,6 +6,7 @@ import {
   Cable,
   CircleCheck,
   Crosshair,
+  FileText,
   FolderOpen,
   MoveVertical,
   Plus,
@@ -20,7 +21,7 @@ import {
 import { useToast } from "../components/Toasts";
 import { translator, useT } from "../i18n";
 import { Button, Field, NumberInput, Section, Segmented, Select, StatusDot, TextInput, Toggle } from "../components/ui";
-import { calibrate, errorMessage, feedLabel, listDevices, openModelsDir, printJob, scanBle } from "../lib/api";
+import { calibrate, errorMessage, feedLabel, listDevices, openLogDir, openModelsDir, printJob, scanBle } from "../lib/api";
 import { useConfig } from "../lib/config";
 import {
   describeConnection,
@@ -44,7 +45,17 @@ import type {
 
 function ConnectionIcon({ connection, className = "size-4" }: { connection: Connection; className?: string }) {
   if (connection.type === "usb") return <Cable className={className} />;
-  if (connection.type === "serial" || connection.type === "ble") return <Bluetooth className={className} />;
+  if (connection.type === "serial") return <Bluetooth className={className} />;
+  if (connection.type === "ble") {
+    return (
+      <span className="relative inline-flex">
+        <Bluetooth className={className} />
+        <span className="absolute -right-2 -bottom-1 rounded-sm bg-accent px-0.5 text-[7px] leading-tight font-bold text-on-accent">
+          LE
+        </span>
+      </span>
+    );
+  }
   return <Server className={className} />;
 }
 
@@ -135,12 +146,16 @@ function DeviceFinder() {
     }
   };
 
+  const simplify = (name: string) => name.toLowerCase().replace(/[\s_-]/g, "");
+  const bleNames = new Set(ble.map((d) => simplify(d.name)));
   const found = devices
     ? candidates(devices, ble, models).filter(
         (c) =>
           // USB printer-class devices are printers by definition; serial ports and CUPS
           // queues can be anything, so only recognised ones are offered by default.
           (showAll || c.connection.type === "usb" || c.recognised) &&
+          // Dual-mode printers found via LE as well: LE is the reliable way on macOS.
+          (showAll || c.connection.type !== "serial" || !bleNames.has(simplify(c.name))) &&
           !config.printers.some((p) => sameConnection(p.connection, c.connection)),
       )
     : [];
@@ -311,7 +326,11 @@ function PrinterEditor({ printer }: { printer: Printer }) {
             {entry.error ??
               (entry.status?.model
                 ? t("printers.editor.firmware", { model: entry.status.model, firmware: entry.status.firmware ?? "?" })
-                : t(printer.connection.type === "cups" ? "printers.editor.cupsNoStatus" : "printers.editor.notQueried"))}
+                : printer.connection.type === "cups"
+                  ? t("printers.editor.cupsNoStatus")
+                  : entry.status?.connected && !entry.status.responsive
+                    ? t("printers.editor.noAnswer")
+                    : t("printers.editor.notQueried"))}
           </span>
         </div>
         <Button size="sm" busy={entry.checking} icon={<RefreshCw className="size-3.5" />} onClick={() => void status.refresh(printer)}>
@@ -491,6 +510,13 @@ function PrinterEditor({ printer }: { printer: Printer }) {
               {t("printers.editor.calibrate")}
             </Button>
           )}
+          <Button
+            variant="ghost"
+            icon={<FileText className="size-4" />}
+            onClick={() => void openLogDir().catch((err) => toast.error(errorMessage(err)))}
+          >
+            {t("printers.editor.openLog")}
+          </Button>
         </div>
         <p className="text-[11px] leading-relaxed text-faint">
           {t("printers.editor.toolsHint")}

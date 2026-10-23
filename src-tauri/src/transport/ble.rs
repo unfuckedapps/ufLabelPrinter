@@ -29,6 +29,8 @@ pub struct BleDeviceInfo {
     pub id: String,
     pub name: String,
     pub rssi: Option<i16>,
+    /// Advertises one of the known printer services.
+    pub printer_service: bool,
 }
 
 /// Lower 96 bits of the Bluetooth base UUID `0000xxxx-0000-1000-8000-00805f9b34fb`.
@@ -45,27 +47,38 @@ fn is_standard_service(uuid: Uuid) -> bool {
     value & ((1 << 96) - 1) == BASE_UUID_LOW && (value >> 104) & 0xff == 0x18
 }
 
-/// Write characteristics of common printer UART services, most specific first:
-/// Phomemo/QIN (FF02, seen in Labelife), Microchip ISSC transparent UART, Nordic UART,
-/// and the AE01 used by many cheap printers.
-const WRITE_CHARS: [Uuid; 4] = [
+/// Printer UART services as advertised: Phomemo/QIN (FF00), Microchip ISSC transparent
+/// UART, Nordic UART, the AE30 and 18F0 services of many cheap printers.
+const PRINTER_SERVICES: [Uuid; 5] = [
+    uuid16(0xff00),
+    Uuid::from_u128(0x49535343_fe7d_4ae5_8fa9_9fafd205e455),
+    Uuid::from_u128(0x6e400001_b5a3_f393_e0a9_e50e24dcca9e),
+    uuid16(0xae30),
+    uuid16(0x18f0),
+];
+
+/// Their write characteristics, most specific first (FF02 is what Labelife uses).
+const WRITE_CHARS: [Uuid; 5] = [
     uuid16(0xff02),
     Uuid::from_u128(0x49535343_8841_43f4_a8d4_ecbe34729bb3),
     Uuid::from_u128(0x6e400002_b5a3_f393_e0a9_e50e24dcca9e),
     uuid16(0xae01),
+    uuid16(0x2af1),
 ];
 
 /// The matching reply (notify) characteristics.
-const NOTIFY_CHARS: [Uuid; 4] = [
+const NOTIFY_CHARS: [Uuid; 5] = [
     uuid16(0xff03),
     Uuid::from_u128(0x49535343_1e4d_4bd9_ba61_23c647249616),
     Uuid::from_u128(0x6e400003_b5a3_f393_e0a9_e50e24dcca9e),
     uuid16(0xae02),
+    uuid16(0x2af0),
 ];
 
 const SCAN_TIME: Duration = Duration::from_secs(4);
 const FIND_TIMEOUT: Duration = Duration::from_secs(10);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const DISCOVER_TIMEOUT: Duration = Duration::from_secs(10);
 /// One chunk not accepted for this long means the printer stopped reading.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -122,22 +135,29 @@ pub fn scan() -> Result<Vec<BleDeviceInfo>> {
         tokio::time::sleep(SCAN_TIME).await;
         let _ = adapter.stop_scan().await;
 
-        let mut found = Vec::new();
+        let mut found: Vec<BleDeviceInfo> = Vec::new();
         for p in adapter.peripherals().await.map_err(ble_err)? {
             let Some(props) = p.properties().await.map_err(ble_err)? else {
                 continue;
             };
-            let Some(name) = props.local_name.or(props.advertisement_name) else {
+            let Some(name) = props.local_name.clone().or(props.advertisement_name.clone()) else {
                 continue;
             };
+            log::debug!(
+                "scan: {name:?} id={} rssi={:?} services={:?} manufacturer={:?}",
+                p.id(),
+                props.rssi,
+                props.services,
+                props.manufacturer_data.keys().collect::<Vec<_>>()
+            );
             found.push(BleDeviceInfo {
                 id: p.id().to_string(),
                 name,
                 rssi: props.rssi,
+                printer_service: props.services.iter().any(|s| PRINTER_SERVICES.contains(s)),
             });
         }
-        found.sort_by(|a, b| b.rssi.cmp(&a.rssi));
-        Ok(found)
+        Ok(dedupe(found))
     })
 }
 
@@ -159,12 +179,25 @@ async fn retrieve(_adapter: &Adapter, _id: &str) -> Option<Peripheral> {
     None
 }
 
+/// Dual-mode printers can show up more than once under the same name; keep the entry
+/// that advertises a printer service, then the strongest signal.
+fn dedupe(mut found: Vec<BleDeviceInfo>) -> Vec<BleDeviceInfo> {
+    found.sort_by(|a, b| {
+        (b.printer_service, b.rssi.unwrap_or(i16::MIN)).cmp(&(a.printer_service, a.rssi.unwrap_or(i16::MIN)))
+    });
+    let mut seen = std::collections::HashSet::new();
+    found.retain(|d| seen.insert(d.name.clone()));
+    found
+}
+
 /// Finds a printer by id; falls back to its name in case the id changed (it is per Mac).
 async fn find(id: &str, name: &str) -> Result<Peripheral> {
     let adapter = adapter().await?;
     if let Some(p) = retrieve(adapter, id).await {
+        log::debug!("{name}: retrieved known peripheral {id}");
         return Ok(p);
     }
+    log::debug!("{name}: not known to CoreBluetooth, scanning for {id}");
 
     adapter.start_scan(ScanFilter::default()).await.map_err(ble_err)?;
     let deadline = Instant::now() + FIND_TIMEOUT;
@@ -203,15 +236,27 @@ fn pick(chars: &[Characteristic], known: &[Uuid], flags: CharPropFlags) -> Optio
 
 async fn connect(id: &str, name: &str) -> Result<Link> {
     let peripheral = find(id, name).await?;
+    let started = Instant::now();
     if !peripheral.is_connected().await.map_err(ble_err)? {
+        log::debug!("{name}: connecting");
         tokio::time::timeout(CONNECT_TIMEOUT, peripheral.connect())
             .await
-            .map_err(|_| Error::ConnectFailed { path: name.to_owned() })?
+            .map_err(|_| {
+                log::warn!("{name}: no connection after {CONNECT_TIMEOUT:?}");
+                Error::ConnectFailed { path: name.to_owned() }
+            })?
             .map_err(ble_err)?;
     }
-    peripheral.discover_services().await.map_err(ble_err)?;
+    log::debug!("{name}: connected after {:?}, discovering services", started.elapsed());
+    tokio::time::timeout(DISCOVER_TIMEOUT, peripheral.discover_services())
+        .await
+        .map_err(|_| Error::Ble(format!("{name}: service discovery timed out")))?
+        .map_err(ble_err)?;
 
     let chars: Vec<_> = peripheral.characteristics().into_iter().collect();
+    for c in &chars {
+        log::debug!("{name}: service {} char {} {:?}", c.service_uuid, c.uuid, c.properties);
+    }
     let writable = CharPropFlags::WRITE | CharPropFlags::WRITE_WITHOUT_RESPONSE;
     let write = pick(&chars, &WRITE_CHARS, writable)
         // Unknown printer: any writable characteristic outside the standard 0x18xx services.
@@ -231,6 +276,13 @@ async fn connect(id: &str, name: &str) -> Result<Link> {
             .find(|c| c.service_uuid == write.service_uuid && c.properties.contains(CharPropFlags::NOTIFY))
             .cloned()
     });
+    log::info!(
+        "{name}: writing to {} {:?}, replies on {:?}, mtu {}",
+        write.uuid,
+        write.properties,
+        notify.as_ref().map(|c| c.uuid),
+        peripheral.mtu()
+    );
     Ok(Link {
         peripheral,
         write,
@@ -280,6 +332,8 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
     let fast = link.write.properties.contains(CharPropFlags::WRITE_WITHOUT_RESPONSE);
     let confirmable = link.write.properties.contains(CharPropFlags::WRITE);
     let chunks: Vec<_> = data.chunks(chunk).collect();
+    // Connected: tell the UI that sending starts now.
+    progress.report(0, data.len());
 
     for (i, part) in chunks.iter().enumerate() {
         if progress.is_cancelled() {
@@ -308,8 +362,8 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
         // No acknowledged write available: give CoreBluetooth time to flush its queue.
         tokio::time::sleep(Duration::from_millis(800)).await;
     }
-    eprintln!(
-        "[ble] {}: {} bytes in {:.1}s, {chunk} byte chunks",
+    log::info!(
+        "{}: {} bytes in {:.1}s, {chunk} byte chunks",
         link.write.uuid,
         data.len(),
         started.elapsed().as_secs_f32()
@@ -363,6 +417,19 @@ async fn exchange_on(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_one_entry_per_name() {
+        let device = |id: &str, rssi, printer_service| BleDeviceInfo {
+            id: id.into(),
+            name: "D530 Pro".into(),
+            rssi: Some(rssi),
+            printer_service,
+        };
+        let kept = dedupe(vec![device("a", -40, false), device("b", -70, true), device("c", -50, false)]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].id, "b", "the one advertising a printer service wins");
+    }
 
     #[test]
     fn builds_16_bit_uuids_and_spots_standard_services() {

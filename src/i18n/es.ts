@@ -27,7 +27,7 @@ export const es: Dictionary = {
   },
   connection: {
     usb: "USB",
-    serial: "Bluetooth",
+    serial: "Bluetooth Clásico",
     ble: "Bluetooth LE",
     cups: "CUPS",
   },
@@ -87,7 +87,7 @@ export const es: Dictionary = {
       other: "{count} etiquetas enviadas a {printer}",
     },
     failed: "Error al imprimir: {error}",
-    preparing: "Preparando …",
+    preparing: "Conectando con la impresora …",
     sending: "Enviando {percent} % · {sent} / {total} KB",
     cancel: "Cancelar",
   },
@@ -131,6 +131,7 @@ export const es: Dictionary = {
       firmware: "{model} · firmware {firmware}",
       cupsNoStatus: "CUPS no informa del estado del dispositivo",
       notQueried: "Aún no consultada",
+      noAnswer: "Accesible, pero la impresora no respondió a la consulta de estado",
       status: "Estado",
       general: "General",
       name: "Nombre",
@@ -171,6 +172,7 @@ export const es: Dictionary = {
       calibrate: "Calibrar sensor",
       calibrateTitle: "Vuelve a medir la etiqueta y el espacio; hace avanzar algunas etiquetas",
       calibrating: "Calibración iniciada",
+      openLog: "Abrir carpeta de registros",
       toolsHint:
         "La etiqueta de prueba muestra un marco justo en el borde de la etiqueta, reglas y patrones de líneas. Si el marco está desplazado, corrígelo con el ajuste fino. Calibra una vez tras cambiar el rollo.",
       confirmRemove: "¿Quitar «{name}» de verdad?",

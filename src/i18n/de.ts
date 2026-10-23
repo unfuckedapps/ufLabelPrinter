@@ -27,7 +27,7 @@ export const de: Dictionary = {
   },
   connection: {
     usb: "USB",
-    serial: "Bluetooth",
+    serial: "Bluetooth Classic",
     ble: "Bluetooth LE",
     cups: "CUPS",
   },
@@ -84,7 +84,7 @@ export const de: Dictionary = {
     noPrinter: "Kein Drucker",
     sent: { one: "{count} Etikett an {printer} gesendet", other: "{count} Etiketten an {printer} gesendet" },
     failed: "Druck fehlgeschlagen: {error}",
-    preparing: "Bereite vor …",
+    preparing: "Verbinde mit dem Drucker …",
     sending: "Sende {percent} % · {sent} / {total} KB",
     cancel: "Abbrechen",
   },
@@ -128,6 +128,7 @@ export const de: Dictionary = {
       firmware: "{model} · Firmware {firmware}",
       cupsNoStatus: "CUPS meldet keinen Gerätestatus",
       notQueried: "Noch nicht abgefragt",
+      noAnswer: "Erreichbar, aber der Drucker hat nicht auf die Statusabfrage geantwortet",
       status: "Status",
       general: "Allgemein",
       name: "Name",
@@ -168,6 +169,7 @@ export const de: Dictionary = {
       calibrate: "Sensor kalibrieren",
       calibrateTitle: "Misst Etikett und Lücke neu ein – schiebt dabei einige Etiketten vor",
       calibrating: "Kalibrierung gestartet",
+      openLog: "Log-Ordner öffnen",
       toolsHint:
         "Das Testetikett zeigt einen Rahmen genau an der Etikettenkante, Lineale und Linienmuster. Sitzt der Rahmen schief, mit der Feinjustierung nachstellen. Nach einem Rollenwechsel einmal kalibrieren.",
       confirmRemove: "„{name}“ wirklich entfernen?",

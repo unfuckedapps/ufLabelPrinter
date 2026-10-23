@@ -32,6 +32,8 @@ btleplug = "0.13"
 uuid = "1"
 futures = "0.3"
 tokio = { version = "1", features = ["time"] }
+tauri-plugin-log = "2"
+log = "0.4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

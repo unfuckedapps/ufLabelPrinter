@@ -81,7 +81,10 @@ fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
             }
             _ => Error::Other(format!("{path}: {err}")),
         })?,
-        Err(_) => return Err(connect_failed()),
+        Err(_) => {
+            log::warn!("{path}: no Bluetooth connection after {CONNECT_TIMEOUT:?}");
+            return Err(connect_failed());
+        }
     };
 
     // serialport leaves the descriptor blocking, so a full RFCOMM buffer would park us
@@ -102,6 +105,8 @@ pub fn send(path: &str, data: &[u8], progress: &Progress) -> Result<()> {
     let mut port = open(path, STALL_TIMEOUT)?;
     let started = Instant::now();
     let mut sent = 0;
+    // Connected: tell the UI that sending starts now.
+    progress.report(0, data.len());
 
     while sent < data.len() {
         if progress.is_cancelled() {
@@ -150,8 +155,8 @@ pub fn send(path: &str, data: &[u8], progress: &Progress) -> Result<()> {
     }
     progress.report(data.len(), data.len());
     std::thread::sleep(Duration::from_millis(500));
-    eprintln!(
-        "[serial] {path}: {} bytes in {:.1}s ({:.1} KB/s)",
+    log::info!(
+        "{path}: {} bytes in {:.1}s ({:.1} KB/s)",
         data.len(),
         started.elapsed().as_secs_f32(),
         data.len() as f32 / 1024.0 / started.elapsed().as_secs_f32()

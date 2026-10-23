@@ -15,6 +15,20 @@ use models::ModelRegistry;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Hardware problems are only debuggable with a log the user can send:
+        // ~/Library/Logs/com.unfuckedapps.thermalprinter/Thermalprinter.log on macOS.
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir { file_name: None }),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                ])
+                .level(log::LevelFilter::Info)
+                .level_for("thermalprinter_lib", log::LevelFilter::Debug)
+                .level_for("btleplug", log::LevelFilter::Debug)
+                .max_file_size(2_000_000)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(DeviceState::default())
@@ -27,6 +41,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_models,
             commands::open_models_dir,
+            commands::open_log_dir,
             commands::list_devices,
             commands::scan_ble,
             commands::printer_status,
