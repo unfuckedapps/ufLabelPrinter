@@ -36,6 +36,9 @@ pub struct PrinterStatus {
     pub firmware: Option<String>,
     pub paper: Option<bool>,
     pub cover_open: Option<bool>,
+    /// The Bluetooth module (from the BLE Device Information service), e.g.
+    /// "FSC-BT986 9.7.7"; often all a printer reveals about itself over BLE.
+    pub module: Option<String>,
 }
 
 impl PrinterStatus {

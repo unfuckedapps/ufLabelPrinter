@@ -132,6 +132,7 @@ export const en = {
       cupsNoStatus: "CUPS reports no device status",
       notQueried: "Not queried yet",
       noAnswer: "Reachable, but the printer did not answer the status query",
+      module: "Bluetooth module {module}",
       status: "Status",
       general: "General",
       name: "Name",

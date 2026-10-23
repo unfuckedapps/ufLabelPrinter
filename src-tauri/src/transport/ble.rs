@@ -615,9 +615,12 @@ pub fn status(
         let reply = reply?;
         let mut status = dialect.map_or_else(PrinterStatus::connected, |d| d.parse(&reply));
         status.connected = true;
-        status.responsive |= info.model.is_some() || info.firmware.is_some();
-        status.model = status.model.or(info.model);
-        status.firmware = status.firmware.or(info.firmware);
+        // Device Information describes the radio module (e.g. Feasycom FSC-BT986), not
+        // the printer, so it is reported separately.
+        status.module = match (info.model, info.firmware) {
+            (Some(model), Some(firmware)) => Some(format!("{model} {}", firmware.split(',').next().unwrap_or(&firmware))),
+            (model, firmware) => model.or(firmware),
+        };
         Ok(status)
     })
 }

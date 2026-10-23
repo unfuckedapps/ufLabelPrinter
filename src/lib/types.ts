@@ -79,6 +79,8 @@ export interface PrinterStatus {
   firmware: string | null;
   paper: boolean | null;
   coverOpen: boolean | null;
+  /** Bluetooth module info from BLE Device Information, e.g. "FSC-BT986 9.7.7". */
+  module: string | null;
 }
 
 export interface UsbDevice {

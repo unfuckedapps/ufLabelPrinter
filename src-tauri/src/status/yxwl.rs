@@ -10,11 +10,12 @@ const QUERIES: [&str; 4] = ["~!T", "READC VERSION", "READC MDDLE", "READC PRDOCU
 
 pub struct Yxwl;
 
+/// Printable text lines only: binary YPL frames from other channels end up in the reply.
 fn lines(reply: &[u8]) -> impl Iterator<Item = String> + '_ {
     reply
         .split(|b| matches!(b, b'\r' | b'\n' | 0))
+        .filter(|l| !l.is_empty() && l.iter().all(|b| b.is_ascii_graphic() || *b == b' '))
         .map(|l| String::from_utf8_lossy(l).trim().to_owned())
-        .filter(|l| !l.is_empty())
 }
 
 fn looks_like_version(line: &str) -> bool {
@@ -37,7 +38,7 @@ impl StatusDialect for Yxwl {
     fn parse(&self, reply: &[u8]) -> PrinterStatus {
         log::info!("yxwl status reply {:?}", String::from_utf8_lossy(reply));
         let mut status = PrinterStatus::connected();
-        status.responsive = !reply.is_empty();
+        status.responsive = lines(reply).next().is_some();
         for line in lines(reply) {
             // "KEY:VALUE" or "KEY=VALUE" replies: look at the value.
             let value = line
@@ -71,5 +72,7 @@ mod tests {
         assert_eq!(status.firmware.as_deref(), Some("V1.2.07"));
 
         assert!(!Yxwl.parse(b"").responsive);
+        // A binary YPL heartbeat is not an answer.
+        assert!(!Yxwl.parse(&[0xfe, 0xea, 0x00, 0x05, 0x22, 0x00, 0x00, 0x02, 0xef]).responsive);
     }
 }

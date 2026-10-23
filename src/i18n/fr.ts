@@ -132,6 +132,7 @@ export const fr: Dictionary = {
       cupsNoStatus: "CUPS ne fournit pas l’état de l’appareil",
       notQueried: "Pas encore interrogée",
       noAnswer: "Joignable, mais l’imprimante n’a pas répondu à la demande d’état",
+      module: "Module Bluetooth {module}",
       status: "État",
       general: "Général",
       name: "Nom",

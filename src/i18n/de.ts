@@ -129,6 +129,7 @@ export const de: Dictionary = {
       cupsNoStatus: "CUPS meldet keinen Gerätestatus",
       notQueried: "Noch nicht abgefragt",
       noAnswer: "Erreichbar, aber der Drucker hat nicht auf die Statusabfrage geantwortet",
+      module: "Bluetooth-Modul {module}",
       status: "Status",
       general: "Allgemein",
       name: "Name",

@@ -328,9 +328,11 @@ function PrinterEditor({ printer }: { printer: Printer }) {
                 ? t("printers.editor.firmware", { model: entry.status.model, firmware: entry.status.firmware ?? "?" })
                 : printer.connection.type === "cups"
                   ? t("printers.editor.cupsNoStatus")
-                  : entry.status?.connected && !entry.status.responsive
-                    ? t("printers.editor.noAnswer")
-                    : t("printers.editor.notQueried"))}
+                  : entry.status?.module
+                    ? t("printers.editor.module", { module: entry.status.module })
+                    : entry.status?.connected && !entry.status.responsive
+                      ? t("printers.editor.noAnswer")
+                      : t("printers.editor.notQueried"))}
           </span>
         </div>
         <Button size="sm" busy={entry.checking} icon={<RefreshCw className="size-3.5" />} onClick={() => void status.refresh(printer)}>
