@@ -3,8 +3,10 @@
 //! driver, which on macOS is flaky with dual-mode printers like the Phomemo D530 Pro.
 //!
 //! Printers expose a UART-like service: one characteristic to write print data to and
-//! one that notifies replies. Writes go out in MTU-sized chunks; CoreBluetooth paces
-//! write-without-response itself (btleplug waits for "ready to send").
+//! one that notifies replies. Everything is sent as write-without-response (ATT Write
+//! Command): the Phomemo D530 Pro silently drops acknowledged writes, and Labelife
+//! never uses them either. CoreBluetooth paces these writes itself (btleplug waits for
+//! "ready to send").
 
 use std::future::Future;
 use std::sync::OnceLock;
@@ -81,6 +83,11 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const DISCOVER_TIMEOUT: Duration = Duration::from_secs(10);
 /// One chunk not accepted for this long means the printer stopped reading.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+/// macOS negotiates up to 512 bytes, but the UART bridges in cheap printers have small
+/// buffers; 180 bytes (the common iOS MTU) is what such modules reliably handle.
+const MAX_CHUNK: usize = 180;
+/// Unacknowledged writes may still be in flight when the last one is queued.
+const DRAIN_DELAY: Duration = Duration::from_secs(1);
 
 fn ble_err(err: btleplug::Error) -> Error {
     match err {
@@ -293,16 +300,20 @@ async fn connect(id: &str, name: &str) -> Result<Link> {
 impl Link {
     fn chunk_size(&self) -> usize {
         // MTU minus the 3-byte ATT header; CoreBluetooth reports at least 23.
-        usize::from(self.peripheral.mtu()).saturating_sub(3).clamp(20, 512)
+        usize::from(self.peripheral.mtu()).saturating_sub(3).clamp(20, MAX_CHUNK)
     }
 
-    /// Acknowledged if the characteristic allows it; used for short commands.
-    async fn write_command(&self, data: &[u8]) -> Result<()> {
-        let kind = if self.write.properties.contains(CharPropFlags::WRITE) {
-            WriteType::WithResponse
-        } else {
+    /// Write commands where possible; acknowledged writes only for printers without them.
+    fn write_type(&self) -> WriteType {
+        if self.write.properties.contains(CharPropFlags::WRITE_WITHOUT_RESPONSE) {
             WriteType::WithoutResponse
-        };
+        } else {
+            WriteType::WithResponse
+        }
+    }
+
+    async fn write_command(&self, data: &[u8]) -> Result<()> {
+        let kind = self.write_type();
         for part in data.chunks(self.chunk_size()) {
             tokio::time::timeout(WRITE_TIMEOUT, self.peripheral.write(&self.write, part, kind))
                 .await
@@ -329,8 +340,7 @@ pub fn send(id: &str, name: &str, data: &[u8], progress: &Progress) -> Result<()
 async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()> {
     let started = Instant::now();
     let chunk = link.chunk_size();
-    let fast = link.write.properties.contains(CharPropFlags::WRITE_WITHOUT_RESPONSE);
-    let confirmable = link.write.properties.contains(CharPropFlags::WRITE);
+    let kind = link.write_type();
     let chunks: Vec<_> = data.chunks(chunk).collect();
     // Connected: tell the UI that sending starts now.
     progress.report(0, data.len());
@@ -339,14 +349,6 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
         if progress.is_cancelled() {
             return Err(Error::Cancelled);
         }
-        let last = i + 1 == chunks.len();
-        // A final acknowledged write makes sure everything before it reached the printer
-        // before we disconnect (writes are delivered in order).
-        let kind = if fast && !(last && confirmable) {
-            WriteType::WithoutResponse
-        } else {
-            WriteType::WithResponse
-        };
         let sent = i * chunk;
         match tokio::time::timeout(WRITE_TIMEOUT, link.peripheral.write(&link.write, part, kind)).await {
             Ok(Ok(())) => {}
@@ -358,9 +360,9 @@ async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()
         }
         progress.report((i * chunk + part.len()).min(data.len()), data.len());
     }
-    if fast && !confirmable {
-        // No acknowledged write available: give CoreBluetooth time to flush its queue.
-        tokio::time::sleep(Duration::from_millis(800)).await;
+    if kind == WriteType::WithoutResponse {
+        // Disconnecting right away could drop packets still queued in CoreBluetooth.
+        tokio::time::sleep(DRAIN_DELAY).await;
     }
     log::info!(
         "{}: {} bytes in {:.1}s, {chunk} byte chunks",
