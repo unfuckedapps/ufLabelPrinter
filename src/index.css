@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-err: var(--err);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+:root {
+  --canvas: #efede8;
+  --panel: #fbfaf8;
+  --sunken: #e6e3dc;
+  --line: #d9d5cc;
+  --ink: #1d1c1a;
+  --muted: #6b675f;
+  --faint: #9a958b;
+  --accent: #d9480f;
+  --accent-soft: #fbe3d6;
+  --on-accent: #ffffff;
+  --ok: #2f9e44;
+  --warn: #e67700;
+  --err: #c92a2a;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #161614;
+    --panel: #201f1d;
+    --sunken: #121210;
+    --line: #34322e;
+    --ink: #ecebe7;
+    --muted: #a19d94;
+    --faint: #6f6b63;
+    --accent: #ff7a3d;
+    --accent-soft: #3a2418;
+    --on-accent: #1b0f08;
+    --ok: #51cf66;
+    --warn: #ffa94d;
+    --err: #ff6b6b;
+    color-scheme: dark;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The printed label: a sheet of thermal paper casting a soft shadow on the backdrop. */
+.label-sheet {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 8px 30px rgb(0 0 0 / 0.12);
+}
+
+.backdrop-grid {
+  background-color: var(--sunken);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
