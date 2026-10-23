@@ -43,7 +43,7 @@ itself and talks to the printer directly over **USB**, **Bluetooth** or, if you 
 | Printer                 | Connection      | Language | Status            | Notes                                                    |
 | ----------------------- | --------------- | -------- | ----------------- | -------------------------------------------------------- |
 | Phomemo D530 Pro        | USB, Bluetooth  | TSPL     | yes (`phomemo`)   | 300 dpi. Shows up as "QIN LabelPrinter" on USB.          |
-| Vevor Y468BT            | Bluetooth       | TSPL     | –                 | 203 dpi, printing not verified yet                       |
+| Vevor Y468BT            | USB, Bluetooth  | TSPL     | –                 | 203 or 300 dpi variants, printing not verified yet       |
 | Generic TSPL, 203 dpi   | USB, BT, CUPS   | TSPL     | –                 | Most 4" shipping label printers speak TSPL               |
 | Generic TSPL, 300 dpi   | USB, BT, CUPS   | TSPL     | –                 |                                                          |
 

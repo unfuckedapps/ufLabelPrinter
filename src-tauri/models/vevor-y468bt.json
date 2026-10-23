@@ -3,7 +3,7 @@
   "vendor": "Vevor",
   "name": "Y468BT",
   "protocol": "tspl",
-  "dpi": 203,
+  "dpi": 300,
   "maxWidthMm": 108,
   "match": {
     "usb": [{ "vendorId": 22872, "productId": 1128 }],
@@ -17,5 +17,5 @@
   },
   "speeds": [2, 3, 4, 5, 6],
   "density": { "min": 0, "max": 15 },
-  "notes": "Shows up on USB as \"YXWL Y468BT\". The Vevor CUPS driver emits TSPL at 203 dpi (default gap 3 mm, darkness 8). Status queries are not known yet."
+  "notes": "Shows up on USB as \"YXWL Y468BT\". Sold with 203 or 300 dpi under the same USB id (Vevor ships a CUPS driver for each, both TSPL, default gap 3 mm, darkness 8); if the test label rulers come out shorter or longer than real millimetres, switch the resolution. Status queries are not known yet."
 }
