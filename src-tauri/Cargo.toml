@@ -31,7 +31,7 @@ lzokay = "2"
 btleplug = "0.13"
 uuid = "1"
 futures = "0.3"
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["sync", "time"] }
 tauri-plugin-log = "2"
 log = "0.4"
 

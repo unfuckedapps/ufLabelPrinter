@@ -4,12 +4,12 @@
 //!
 //! Printers expose a UART-like service: one characteristic to write print data to and
 //! one that notifies replies. Everything is sent as write-without-response (ATT Write
-//! Command): the Phomemo D530 Pro silently drops acknowledged writes, and Labelife
-//! never uses them either. CoreBluetooth paces these writes itself (btleplug waits for
-//! "ready to send").
+//! Command), as Labelife does, and paced by the printer's credit-based flow control
+//! (see [`Flow`]) where it offers one.
 
 use std::future::Future;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use btleplug::api::{
@@ -228,10 +228,87 @@ async fn find(id: &str, name: &str) -> Result<Peripheral> {
     found.ok_or_else(|| Error::NotFound(format!("{name} is not in Bluetooth range")))
 }
 
+/// Flow control of the Aimo/QIN firmware (Phomemo and others), reverse engineered from
+/// Labelife. The printer talks on the notify characteristic:
+///
+/// - `01 n` grants `n` more packets; every write spends one, none is sent without.
+/// - `02 n` caps the packet size at `n` bytes.
+/// - `7E 01 7E …` asks for CRC-framed packets (see [`crc_frame`]).
+///
+/// Anything else is reply data (e.g. `SSSGETPAPER:YES`). Printers that never announce
+/// credits are written to freely.
+#[derive(Default)]
+struct Flow {
+    credits: AtomicI64,
+    /// 0 until the printer announced a limit.
+    limit: AtomicUsize,
+    /// The printer speaks the credit protocol.
+    managed: AtomicBool,
+    crc: AtomicBool,
+    replies: Mutex<Vec<u8>>,
+}
+
+impl Flow {
+    fn handle(&self, value: &[u8]) {
+        match value {
+            [0x01, n, ..] if *n > 0 => {
+                self.managed.store(true, Ordering::Relaxed);
+                self.credits.fetch_add(i64::from(*n), Ordering::Relaxed);
+            }
+            [0x02, n, ..] => {
+                self.managed.store(true, Ordering::Relaxed);
+                self.limit.store(usize::from(*n), Ordering::Relaxed);
+            }
+            [0x7e, 0x01, 0x7e, ..] => self.crc.store(true, Ordering::Relaxed),
+            _ => self.replies.lock().unwrap_or_else(|p| p.into_inner()).extend_from_slice(value),
+        }
+    }
+}
+
+/// Labelife's `+[AMCrcTool coverData:]`: `7E len_lo len_hi data… xor 7E`, where the
+/// XOR covers everything before it, then byte stuffing between the delimiters
+/// (`7E` → `7D 02`, `7D` → `7D 01`). Labelife finally inserts the number of BLE packets
+/// the frame is split into right after the opening `7E`.
+fn crc_frame(data: &[u8], packet: usize) -> Vec<u8> {
+    let len = data.len() as u16;
+    let mut raw = vec![0x7e, len as u8, (len >> 8) as u8];
+    raw.extend_from_slice(data);
+    let xor = raw.iter().fold(0u8, |acc, b| acc ^ b);
+    raw.push(xor);
+    raw.push(0x7e);
+
+    let mut out = Vec::with_capacity(raw.len() + 8);
+    out.push(raw[0]);
+    for &b in &raw[1..raw.len() - 1] {
+        match b {
+            0x7e => out.extend_from_slice(&[0x7d, 0x02]),
+            0x7d => out.extend_from_slice(&[0x7d, 0x01]),
+            _ => out.push(b),
+        }
+    }
+    out.push(0x7e);
+
+    let packets = out.len() / packet.max(1) + 1;
+    out.insert(1, packets as u8);
+    out
+}
+
+/// How long to wait for the printer's first credits after subscribing.
+const GREETING_WAIT: Duration = Duration::from_millis(1500);
+
+/// Frames under CRC stay small enough for the one-byte packet count.
+const CRC_BLOCK: usize = 4096;
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(" ")
+}
+
 struct Link {
+    name: String,
     peripheral: Peripheral,
     write: Characteristic,
-    notify: Option<Characteristic>,
+    flow: Arc<Flow>,
+    listener: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
 fn pick(chars: &[Characteristic], known: &[Uuid], flags: CharPropFlags) -> Option<Characteristic> {
@@ -290,17 +367,54 @@ async fn connect(id: &str, name: &str) -> Result<Link> {
         notify.as_ref().map(|c| c.uuid),
         peripheral.mtu()
     );
+
+    let flow = Arc::new(Flow::default());
+    let mut listener = None;
+    if let Some(notify) = notify {
+        // Subscribing first: the printer announces its credits as soon as it may talk.
+        let mut stream = peripheral.notifications().await.map_err(ble_err)?;
+        peripheral.subscribe(&notify).await.map_err(ble_err)?;
+        let (flow_rx, label) = (flow.clone(), name.to_owned());
+        listener = Some(tauri::async_runtime::spawn(async move {
+            while let Some(n) = stream.next().await {
+                if n.uuid == notify.uuid {
+                    log::debug!("{label}: notify {}", hex(&n.value));
+                    flow_rx.handle(&n.value);
+                }
+            }
+        }));
+
+        let deadline = Instant::now() + GREETING_WAIT;
+        while !flow.managed.load(Ordering::Relaxed) && Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+    log::info!(
+        "{name}: flow control {}, credits {}, packet limit {}, crc {}",
+        if flow.managed.load(Ordering::Relaxed) { "on" } else { "off" },
+        flow.credits.load(Ordering::Relaxed),
+        flow.limit.load(Ordering::Relaxed),
+        flow.crc.load(Ordering::Relaxed),
+    );
+
     Ok(Link {
+        name: name.to_owned(),
         peripheral,
         write,
-        notify,
+        flow,
+        listener,
     })
 }
 
 impl Link {
     fn chunk_size(&self) -> usize {
         // MTU minus the 3-byte ATT header; CoreBluetooth reports at least 23.
-        usize::from(self.peripheral.mtu()).saturating_sub(3).clamp(20, MAX_CHUNK)
+        let mtu = usize::from(self.peripheral.mtu()).saturating_sub(3).max(20);
+        match self.flow.limit.load(Ordering::Relaxed) {
+            0 => mtu.min(MAX_CHUNK),
+            // Labelife: min(maximumWriteValueLength, announced limit).
+            limit => mtu.min(limit),
+        }
     }
 
     /// Write commands where possible; acknowledged writes only for printers without them.
@@ -312,20 +426,55 @@ impl Link {
         }
     }
 
-    async fn write_command(&self, data: &[u8]) -> Result<()> {
-        let kind = self.write_type();
-        for part in data.chunks(self.chunk_size()) {
-            tokio::time::timeout(WRITE_TIMEOUT, self.peripheral.write(&self.write, part, kind))
-                .await
-                .map_err(|_| Error::Ble("write timed out".into()))?
-                .map_err(ble_err)?;
+    /// Splits `data` into the packets that go on the air, CRC-framed if requested.
+    fn packets(&self, data: &[u8]) -> Vec<Vec<u8>> {
+        let size = self.chunk_size();
+        if !self.flow.crc.load(Ordering::Relaxed) {
+            return data.chunks(size).map(<[u8]>::to_vec).collect();
         }
-        Ok(())
+        data.chunks(CRC_BLOCK)
+            .flat_map(|block| {
+                crc_frame(block, size)
+                    .chunks(size)
+                    .map(<[u8]>::to_vec)
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    /// Waits for a credit if the printer hands them out, then writes one packet.
+    async fn write_packet(&self, packet: &[u8]) -> std::result::Result<(), WriteFailure> {
+        if self.flow.managed.load(Ordering::Relaxed) {
+            let deadline = Instant::now() + WRITE_TIMEOUT;
+            while self.flow.credits.load(Ordering::Relaxed) < 1 {
+                if Instant::now() > deadline {
+                    return Err(WriteFailure::Stalled);
+                }
+                tokio::time::sleep(Duration::from_millis(2)).await;
+            }
+            self.flow.credits.fetch_sub(1, Ordering::Relaxed);
+        }
+        match tokio::time::timeout(WRITE_TIMEOUT, self.peripheral.write(&self.write, packet, self.write_type())).await
+        {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(btleplug::Error::NotConnected)) => Err(WriteFailure::Disconnected),
+            Ok(Err(err)) => Err(WriteFailure::Other(ble_err(err))),
+            Err(_) => Err(WriteFailure::Stalled),
+        }
     }
 
     async fn close(self) {
+        if let Some(listener) = self.listener {
+            listener.abort();
+        }
         let _ = self.peripheral.disconnect().await;
     }
+}
+
+enum WriteFailure {
+    Stalled,
+    Disconnected,
+    Other(Error),
 }
 
 pub fn send(id: &str, name: &str, data: &[u8], progress: &Progress) -> Result<()> {
@@ -339,36 +488,38 @@ pub fn send(id: &str, name: &str, data: &[u8], progress: &Progress) -> Result<()
 
 async fn send_on(link: &Link, data: &[u8], progress: &Progress<'_>) -> Result<()> {
     let started = Instant::now();
-    let chunk = link.chunk_size();
-    let kind = link.write_type();
-    let chunks: Vec<_> = data.chunks(chunk).collect();
+    let packets = link.packets(data);
+    let wire_total: usize = packets.iter().map(Vec::len).sum();
     // Connected: tell the UI that sending starts now.
     progress.report(0, data.len());
 
-    for (i, part) in chunks.iter().enumerate() {
+    let mut on_air = 0;
+    for packet in &packets {
         if progress.is_cancelled() {
             return Err(Error::Cancelled);
         }
-        let sent = i * chunk;
-        match tokio::time::timeout(WRITE_TIMEOUT, link.peripheral.write(&link.write, part, kind)).await {
-            Ok(Ok(())) => {}
-            Ok(Err(btleplug::Error::NotConnected)) => {
-                return Err(Error::Disconnected { sent, total: data.len() });
-            }
-            Ok(Err(err)) => return Err(ble_err(err)),
-            Err(_) => return Err(Error::Stalled { sent, total: data.len() }),
-        }
-        progress.report((i * chunk + part.len()).min(data.len()), data.len());
+        // Progress in job bytes, so framing overhead does not show up in the UI.
+        let sent = on_air * data.len() / wire_total.max(1);
+        link.write_packet(packet).await.map_err(|failure| match failure {
+            WriteFailure::Stalled => Error::Stalled { sent, total: data.len() },
+            WriteFailure::Disconnected => Error::Disconnected { sent, total: data.len() },
+            WriteFailure::Other(err) => err,
+        })?;
+        on_air += packet.len();
+        progress.report(on_air * data.len() / wire_total.max(1), data.len());
     }
-    if kind == WriteType::WithoutResponse {
+    if link.write_type() == WriteType::WithoutResponse {
         // Disconnecting right away could drop packets still queued in CoreBluetooth.
         tokio::time::sleep(DRAIN_DELAY).await;
     }
     log::info!(
-        "{}: {} bytes in {:.1}s, {chunk} byte chunks",
-        link.write.uuid,
+        "{}: {} bytes ({} on air) in {} packets, {:.1}s, credits left {}",
+        link.name,
         data.len(),
-        started.elapsed().as_secs_f32()
+        wire_total,
+        packets.len(),
+        started.elapsed().as_secs_f32(),
+        link.flow.credits.load(Ordering::Relaxed)
     );
     Ok(())
 }
@@ -395,30 +546,51 @@ async fn exchange_on(
     timeout: Duration,
     done: impl Fn(&[u8]) -> bool,
 ) -> Result<Vec<u8>> {
-    let Some(notify) = &link.notify else {
+    if link.listener.is_none() {
         return Ok(Vec::new());
-    };
-    link.peripheral.subscribe(notify).await.map_err(ble_err)?;
-    let mut notifications = link.peripheral.notifications().await.map_err(ble_err)?;
-
-    link.write_command(cmd).await?;
-
-    let deadline = tokio::time::Instant::now() + timeout;
-    let mut reply = Vec::new();
-    while !done(&reply) {
-        match tokio::time::timeout_at(deadline, notifications.next()).await {
-            Ok(Some(n)) if n.uuid == notify.uuid => reply.extend(n.value),
-            Ok(Some(_)) => {}
-            Ok(None) | Err(_) => break,
-        }
     }
-    let _ = link.peripheral.unsubscribe(notify).await;
-    Ok(reply)
+    for packet in link.packets(cmd) {
+        link.write_packet(&packet).await.map_err(|failure| match failure {
+            WriteFailure::Other(err) => err,
+            _ => Error::Ble("status query not accepted".into()),
+        })?;
+    }
+
+    let deadline = Instant::now() + timeout;
+    loop {
+        let reply = link.flow.replies.lock().unwrap_or_else(|p| p.into_inner()).clone();
+        if done(&reply) || Instant::now() > deadline {
+            log::debug!("{}: status reply {:?}", link.name, String::from_utf8_lossy(&reply));
+            return Ok(reply);
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frames_like_labelife_cover_data() {
+        // 7E len(2) 7E-escaped payload xor 7E, packet count inserted after the start.
+        let framed = crc_frame(&[0x41, 0x7e, 0x7d], 180);
+        let xor = [0x7e, 0x03, 0x00, 0x41, 0x7e, 0x7d].iter().fold(0u8, |acc, b| acc ^ b);
+        assert_eq!(framed, vec![0x7e, 0x01, 0x03, 0x00, 0x41, 0x7d, 0x02, 0x7d, 0x01, xor, 0x7e]);
+    }
+
+    #[test]
+    fn parses_flow_control_notifications() {
+        let flow = Flow::default();
+        flow.handle(&[0x02, 0xb4]);
+        flow.handle(&[0x01, 0x05]);
+        flow.handle(&[0x01, 0x03]);
+        flow.handle(b"SSSGETPAPER:YES\r\n");
+        assert!(flow.managed.load(Ordering::Relaxed));
+        assert_eq!(flow.limit.load(Ordering::Relaxed), 180);
+        assert_eq!(flow.credits.load(Ordering::Relaxed), 8);
+        assert_eq!(&*flow.replies.lock().unwrap(), b"SSSGETPAPER:YES\r\n");
+    }
 
     #[test]
     fn keeps_one_entry_per_name() {
