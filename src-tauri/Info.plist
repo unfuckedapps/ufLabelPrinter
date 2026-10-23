@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>Thermalprinter connects to your label printers via Bluetooth.</string>
+  <string>ufLabelPrinter connects to your label printers via Bluetooth.</string>
 </dict>
 </plist>

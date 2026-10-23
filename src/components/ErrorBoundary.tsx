@@ -30,7 +30,7 @@ function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void 
   const [copied, setCopied] = useState(false);
   const hint = hintFor(message);
   const report = [
-    `Thermalprinter ${__APP_VERSION__}`,
+    `ufLabelPrinter ${__APP_VERSION__}`,
     `Time: ${new Date().toISOString()}`,
     `Location: ${window.location.hash || "/"}`,
     `System: ${navigator.userAgent}`,

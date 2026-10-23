@@ -49,7 +49,7 @@ Copy one of the files in [`src-tauri/models/`](../src-tauri/models) and adjust i
 | `compression`      | no       | `"lzo"` if the printer accepts LZO1X bitmaps (TSPL `BITMAP` mode 3). Used over Bluetooth only. |
 
 **Testing without rebuilding:** put the file into
-`~/Library/Application Support/com.unfuckedapps.thermalprinter/models/` (*Printers →
+`~/Library/Application Support/com.unfuckedapps.uflabelprinter/models/` (*Printers →
 Open models folder*) and press *Reload*. If the file is broken, the error is shown
 right there.
 

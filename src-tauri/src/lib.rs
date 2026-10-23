@@ -16,7 +16,7 @@ use models::ModelRegistry;
 pub fn run() {
     tauri::Builder::default()
         // Hardware problems are only debuggable with a log the user can send:
-        // ~/Library/Logs/com.unfuckedapps.thermalprinter/Thermalprinter.log on macOS.
+        // ~/Library/Logs/com.unfuckedapps.uflabelprinter/ufLabelPrinter.log on macOS.
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
@@ -24,7 +24,7 @@ pub fn run() {
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                 ])
                 .level(log::LevelFilter::Info)
-                .level_for("thermalprinter_lib", log::LevelFilter::Debug)
+                .level_for("uflabelprinter_lib", log::LevelFilter::Debug)
                 .level_for("btleplug", log::LevelFilter::Debug)
                 .level_for("nusb", log::LevelFilter::Warn)
                 .max_file_size(2_000_000)

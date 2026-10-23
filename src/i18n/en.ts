@@ -253,7 +253,7 @@ export const en = {
     portUnavailable: "{path} is not available – is the printer switched on and paired?",
     connectFailed: "Could not connect to {path} via Bluetooth. Switch the printer off and on and make sure no phone is connected to it.",
     ble: "Bluetooth LE error",
-    blePermission: "Thermalprinter may not use Bluetooth. Allow it in System Settings → Privacy & Security → Bluetooth.",
+    blePermission: "ufLabelPrinter may not use Bluetooth. Allow it in System Settings → Privacy & Security → Bluetooth.",
     stalled: "Bluetooth transfer stalled at {sentKb} of {totalKb} KB – printer out of range or disconnected?",
     disconnected: "Bluetooth connection dropped after {sentKb} of {totalKb} KB",
     cancelled: "Printing cancelled",

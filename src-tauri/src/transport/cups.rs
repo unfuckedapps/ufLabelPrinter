@@ -49,7 +49,7 @@ fn ppd_resolution(queue: &str) -> Option<u32> {
 
 pub fn send(queue: &str, data: &[u8]) -> Result<()> {
     let mut child = Command::new("lp")
-        .args(["-d", queue, "-o", "raw", "-t", "Thermalprinter", "-"])
+        .args(["-d", queue, "-o", "raw", "-t", "ufLabelPrinter", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())

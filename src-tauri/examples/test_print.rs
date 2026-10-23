@@ -14,9 +14,9 @@
 
 use std::time::Instant;
 
-use thermalprinter_lib::protocol::{self, Compression, JobSettings, Media, Page};
-use thermalprinter_lib::transport::{Connection, Progress};
-use thermalprinter_lib::transport::usb::{self, UsbSelector};
+use uflabelprinter_lib::protocol::{self, Compression, JobSettings, Media, Page};
+use uflabelprinter_lib::transport::{Connection, Progress};
+use uflabelprinter_lib::transport::usb::{self, UsbSelector};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

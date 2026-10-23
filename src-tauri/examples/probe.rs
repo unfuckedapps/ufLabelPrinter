@@ -5,9 +5,9 @@
 
 use std::time::{Duration, Instant};
 
-use thermalprinter_lib::status;
-use thermalprinter_lib::transport::Connection;
-use thermalprinter_lib::transport::usb::{self, UsbPrinter, UsbSelector};
+use uflabelprinter_lib::status;
+use uflabelprinter_lib::transport::Connection;
+use uflabelprinter_lib::transport::usb::{self, UsbPrinter, UsbSelector};
 
 fn main() {
     let extra: Vec<String> = std::env::args().skip(1).collect();

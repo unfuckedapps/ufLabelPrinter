@@ -253,7 +253,7 @@ export const es: Dictionary = {
     portUnavailable: "{path} no está disponible: ¿la impresora está encendida y emparejada?",
     connectFailed: "No se pudo conectar por Bluetooth con {path}. Apaga y enciende la impresora y comprueba que ningún teléfono esté conectado a ella.",
     ble: "Error de Bluetooth LE",
-    blePermission: "Thermalprinter no puede usar Bluetooth. Permítelo en Ajustes del Sistema → Privacidad y seguridad → Bluetooth.",
+    blePermission: "ufLabelPrinter no puede usar Bluetooth. Permítelo en Ajustes del Sistema → Privacidad y seguridad → Bluetooth.",
     stalled: "Transferencia Bluetooth detenida en {sentKb} de {totalKb} KB: ¿impresora fuera de alcance o desconectada?",
     disconnected: "Conexión Bluetooth perdida tras {sentKb} de {totalKb} KB",
     cancelled: "Impresión cancelada",

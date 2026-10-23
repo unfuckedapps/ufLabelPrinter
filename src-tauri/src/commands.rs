@@ -461,9 +461,43 @@ fn config_path(app: &AppHandle) -> Result<PathBuf> {
 }
 
 /// The config is owned by the frontend; Rust only stores it.
+/// Bundle identifiers the app shipped under before; their config dirs sit next to ours.
+const LEGACY_IDENTIFIERS: [&str; 1] = ["com.unfuckedapps.thermalprinter"];
+
+/// First start after a rename: copy config and custom models over so printers, papers
+/// and Bluetooth pairings survive. The old directory is left alone.
+fn adopt_legacy_config(path: &std::path::Path) {
+    let Some(dir) = path.parent() else { return };
+    if path.exists() {
+        return;
+    }
+    for legacy in LEGACY_IDENTIFIERS {
+        let Some(old) = dir.parent().map(|p| p.join(legacy)) else { continue };
+        if !old.join("config.json").exists() {
+            continue;
+        }
+        let copy = || -> std::io::Result<()> {
+            std::fs::create_dir_all(dir.join("models"))?;
+            if let Ok(models) = std::fs::read_dir(old.join("models")) {
+                for model in models.flatten() {
+                    std::fs::copy(model.path(), dir.join("models").join(model.file_name()))?;
+                }
+            }
+            std::fs::copy(old.join("config.json"), path)?;
+            Ok(())
+        };
+        match copy() {
+            Ok(()) => log::info!("adopted config from {}", old.display()),
+            Err(err) => log::warn!("could not adopt config from {}: {err}", old.display()),
+        }
+        return;
+    }
+}
+
 #[tauri::command]
 pub fn load_config(app: AppHandle) -> Result<Option<serde_json::Value>> {
     let path = config_path(&app)?;
+    adopt_legacy_config(&path);
     match std::fs::read(&path) {
         Ok(bytes) => Ok(Some(serde_json::from_slice(&bytes)?)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),

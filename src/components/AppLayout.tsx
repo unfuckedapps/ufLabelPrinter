@@ -171,7 +171,7 @@ export function AppLayout() {
           <div className="flex size-6 items-center justify-center rounded-md bg-ink text-canvas">
             <Printer className="size-3.5" />
           </div>
-          <span className="text-[13px] font-semibold tracking-tight">Thermalprinter</span>
+          <span className="text-[13px] font-semibold tracking-tight">ufLabelPrinter</span>
         </div>
         <nav className="flex rounded-lg bg-sunken p-0.5">
           <Tab to="/" icon={<Printer className="size-3.5" />}>

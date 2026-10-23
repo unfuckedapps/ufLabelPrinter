@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn user_models_override_and_report_errors() {
-        let dir = std::env::temp_dir().join(format!("thermalprinter-models-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("uflabelprinter-models-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("custom.json"),

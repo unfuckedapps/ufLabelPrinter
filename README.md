@@ -1,4 +1,4 @@
-# Thermalprinter
+# ufLabelPrinter
 
 **Unfuck your thermal label printer.**
 
@@ -9,7 +9,7 @@ before printing one label. You get macOS drivers that crop your 105 × 203 mm DH
 onto 4 × 6" paper instead of scaling it, so the address ends up missing. And you need one
 app per printer brand.
 
-Thermalprinter is a small native app that skips all of that. It renders your label
+ufLabelPrinter is a small native app that skips all of that. It renders your label
 itself and talks to the printer directly over **USB**, **Bluetooth** or, if you must,
 **CUPS**. You need no driver, no account and no vendor app.
 
@@ -62,7 +62,7 @@ Node.js ≥ 20 and [pnpm](https://pnpm.io).
 ```sh
 pnpm install
 pnpm tauri dev      # run in development
-pnpm tauri build    # build Thermalprinter.app and a .dmg
+pnpm tauri build    # build ufLabelPrinter.app and a .dmg
 ```
 
 On first start, every USB label printer that is connected is set up automatically.
@@ -94,7 +94,7 @@ PDF / image ──► pdf.js renders at the printer's dpi ──► fit, rotate,
   - `transport/` moves bytes over USB (`nusb`, pure Rust, no libusb), serial ports or `lp`.
   - `models.rs` loads the model files.
 - **Models** (`src-tauri/models/*.json`) are embedded at build time. You can add more at
-  runtime in `~/Library/Application Support/com.unfuckedapps.thermalprinter/models/`.
+  runtime in `~/Library/Application Support/com.unfuckedapps.uflabelprinter/models/`.
 
 ### Poking at hardware
 
