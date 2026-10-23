@@ -2,135 +2,88 @@
 
 **Unfuck your thermal label printer.**
 
-Cheap thermal label printers (Phomemo, Vevor, Munbyn, iDPRT, Jadens and the hundred
-white-label clones of them) are perfectly good hardware. The software they ship with is
-not. You get bloated vendor apps that want an account, a cloud and a firmware update
-before printing one label. You get macOS drivers that crop your 105 × 203 mm DHL label
-onto 4 × 6" paper instead of scaling it, so the address ends up missing. And you need one
-app per printer brand.
+Cheap thermal label printers are great hardware wrapped in terrible software: apps that
+want an account before printing a single label, drivers that crop your shipping label in
+half, and a different app for every printer you own.
 
-ufLabelPrinter is a small native app that skips all of that. It renders your label
-itself and talks to the printer directly over **USB**, **Bluetooth** or, if you must,
-**CUPS**. You need no driver, no account and no vendor app.
+ufLabelPrinter is one small app for all of them. Drop in a shipping label, click print,
+done. No account, no cloud, no driver hunting.
 
 ## What it does
 
-- **Drop in a PDF or image and print it.** Shipping labels from DHL, Deutsche Post,
-  Warenpost and the like, or any PNG/JPG. You can queue several files and print them in
-  one go, set copies per file and see at a glance which ones are already printed.
-- **It scales to the paper you actually loaded.** A label that is bigger than the
-  paper is shrunk to fit, never cropped. Landscape labels are rotated automatically,
-  and white borders can be trimmed so the content uses the whole label.
-- **The preview is exactly what gets printed.** It shows the final 1-bit bitmap at
-  the printer's resolution, so there are no surprises.
-- **Barcodes stay scannable.** Rendering uses a hard threshold at the printer's native
-  dpi instead of fuzzy scaling. In testing, DHL Leitcode/Identcode and Warenpost UPU S10
-  barcodes shrunk to 80 % still decoded at both 300 and 203 dpi.
-- **Paper profiles:** describe each label roll once (size, gap/black-mark/continuous) and
-  switch the loaded paper from the toolbar when you change the roll.
-- **There are printer tools built in:** a calibration test label (edge frame, rulers,
-  line patterns), label feed, sensor calibration, density, speed, 180° flip and
-  fine offsets.
-- **It reports live printer status** (paper, cover, model and firmware) for printers
-  that support it. Status is never queried while the printer is still printing.
-- **It integrates with the system.** You can drag & drop files, use ⌘O / ⌘P, use
-  "Open With" from Finder, or drop files on the Dock icon.
-- **Bluetooth LE without pairing.** Vendor flow control (Phomemo/QIN credits) and
-  compressed bitmaps are handled, so a shipping label goes out in a few seconds.
-- **It is modular.** Printer models are JSON files, and printer languages and status
-  dialects are small Rust modules. See [Adding a printer](docs/adding-a-printer.md).
+- **Prints your shipping labels as they are.** DHL, Deutsche Post, Warenpost or any other
+  PDF or image. Labels that are bigger than your paper are scaled to fit, never cut off.
+- **Works over USB and Bluetooth.** No pairing dance: find the printer, click add, print.
+- **Shows exactly what will come out.** The preview is the real print, dot for dot.
+- **Handles a stack of labels at once.** Drop in ten PDFs, print them all, and see which
+  ones are done.
+- **Remembers your label rolls.** Set up each paper size once and switch with one click
+  when you change the roll.
+- **Speaks your language.** English, German, French and Spanish.
+- **Keeps itself up to date.** New versions install with one click.
 
-## Supported printers
+## Download
 
-| Printer                 | Connection      | Language | Status            | Notes                                                    |
-| ----------------------- | --------------- | -------- | ----------------- | -------------------------------------------------------- |
-| Phomemo D530 Pro        | USB, BLE        | TSPL     | yes (`phomemo`)   | 300 dpi. BLE uses credit flow control + LZO mode 4       |
-| Vevor Y468BT            | USB, BLE        | TSPL     | –                 | 203 or 300 dpi variants                                  |
-| Generic TSPL, 203 dpi   | USB, BT, CUPS   | TSPL     | –                 | Most 4" shipping label printers speak TSPL               |
-| Generic TSPL, 300 dpi   | USB, BT, CUPS   | TSPL     | –                 |                                                          |
+Grab the latest version from the
+[releases page](https://github.com/unfuckedapps/ufLabelPrinter/releases/latest):
 
-Your printer is not listed? If its macOS/Windows driver mentions TSPL, or it is sold as
-"TSC compatible", the generic models will most likely work as they are. Once you have
-confirmed it, please [add a model file](docs/adding-a-printer.md) so it is recognised
-automatically.
+| System                | File                             |
+| --------------------- | -------------------------------- |
+| macOS (Apple Silicon) | `ufLabelPrinter_…_aarch64.dmg`   |
+| macOS (Intel)         | `ufLabelPrinter_…_x64.dmg`       |
+| Windows               | `ufLabelPrinter_…_x64-setup.exe` |
+| Linux                 | `.AppImage`, `.deb` or `.rpm`    |
 
 ## Getting started
 
-Requirements: macOS (the primary target for now), [Rust](https://rustup.rs) ≥ 1.85,
-Node.js ≥ 20 and [pnpm](https://pnpm.io).
+1. **Connect your printer.**
+   - USB: plug it in. On first start it is set up automatically; later add it under
+     **Printers**.
+   - Bluetooth: switch the printer on, open **Printers**, click **Scan Bluetooth LE** and
+     **Add**. The app asks once for permission to use Bluetooth.
+2. **Tell it what paper is loaded.** Open **Paper**, pick the size (for example
+   4 × 6" shipping labels) and choose it in the top right corner.
+3. **Print.** Drag your label PDF into the window and press **Print**.
 
-```sh
-pnpm install
-pnpm tauri dev      # run in development
-pnpm tauri build    # build ufLabelPrinter.app and a .dmg
-```
+Print the **Test label** from the printer page once: if the frame sits exactly on the
+label edge, everything is set up right.
 
-On first start, every USB label printer that is connected is set up automatically.
-Bluetooth printers are added under **Printers → Scan Bluetooth LE**; no pairing in
-System Settings is needed, macOS only asks once for Bluetooth permission. Paired
-Bluetooth Classic printers (`/dev/cu.<name>`) work too, but on macOS LE is far more
-reliable.
+## Works with
 
-The UI is available in English, German, French and Spanish (switch it in the toolbar).
-To add a language, copy `src/i18n/en.ts`, translate it and register it in
-`src/i18n/index.tsx`. TypeScript and `pnpm test` make sure no key is missing.
+| Printer                                 | USB | Bluetooth |
+| --------------------------------------- | :-: | :-------: |
+| Phomemo D530 Pro                        |  ✓  |     ✓     |
+| Vevor Y468BT                            |  ✓  |     ✓     |
+| Most other 4" shipping label printers ¹ |  ✓  |   often   |
 
-## How it works
+¹ Anything sold as "TSPL" or "TSC compatible" will very likely work. Tried a printer that
+is not listed? Please [open an issue](https://github.com/unfuckedapps/ufLabelPrinter/issues)
+and tell us how it went, so it can be recognised automatically.
 
-```
-PDF / image ──► pdf.js renders at the printer's dpi ──► fit, rotate, trim ──► 1-bit threshold
-                                (WebView, TypeScript)
+## Something is off?
 
-1-bit pages ──► protocol (TSPL, …) ──► transport (USB via nusb, Bluetooth SPP, CUPS raw)
-                           (Rust)
-```
-
-- **Frontend** (`src/`): React and Tailwind. `lib/render.ts` rasterises pages,
-  `lib/layout.ts` decides scale and rotation, and `lib/bitmap.ts` does the threshold,
-  dithering and packing.
-- **Backend** (`src-tauri/src/`):
-  - `protocol/` turns pages into printer bytes (`tspl.rs`).
-  - `status/` holds the status query dialects (`phomemo.rs`).
-  - `transport/` moves bytes over USB (`nusb`, pure Rust, no libusb), serial ports or `lp`.
-  - `models.rs` loads the model files.
-- **Models** (`src-tauri/models/*.json`) are embedded at build time. You can add more at
-  runtime in `~/Library/Application Support/com.unfuckedapps.uflabelprinter/models/`.
-
-### Poking at hardware
-
-`cargo run --example probe` lists USB printers and reads their status without printing
-anything. Extra arguments are sent as read-only queries, for example
-`cargo run --example probe -- SSSGETSENSOR`. Pass `/dev/cu.<name>` to query a Bluetooth
-printer instead.
-
-## Troubleshooting
-
-- **The printer stops halfway through a label and beeps.** The vendor apps run into this
-  too. The most likely cause is the power drawn by dense black areas, such as big
-  barcodes printed large. Try a lower **speed** (2–3 in/s) or a lower density in the
-  printer settings, or keep *Trim white borders* off so the label prints a little
-  smaller.
-- **"The printer is busy".** Another program is holding the USB device, usually
-  Labelife or a running CUPS job. Quit it and try again.
-- **Content is offset or cut at the edge.** Print the test label and adjust
-  *Fine tuning*. After changing the roll, run *Calibrate sensor* once.
+- **The label is shifted or cut at an edge.** Print the test label and adjust
+  *Fine tuning* on the printer page. After changing the roll, press *Calibrate sensor*.
 - **The label comes out upside down.** Turn on *Rotate print by 180°*.
-- **Bluetooth is slow or drops.** Models with `"compression": "lzo"` send labels
-  compressed (about 15 KB instead of 270 KB). A transfer that makes no progress for 10 s
-  is aborted, and you can cancel any job from the progress bar.
+- **The printer stops halfway and beeps.** Choose a lower *Speed* on the printer page.
+- **"The printer is busy".** Another program, often the vendor app, is using the
+  printer. Close it and try again.
+- **Bluetooth printer not found.** Make sure it is switched on and not connected to your
+  phone; these printers only talk to one device at a time.
+- **Windows and USB.** Windows locks USB printers to its own driver. Use Bluetooth, or add
+  the printer in Windows with the *Generic / Text Only* driver and pick it under
+  *Show unrecognised devices*.
 
-## Development
+Still stuck? The printer page has an **Open log folder** button; attach the log to an
+[issue](https://github.com/unfuckedapps/ufLabelPrinter/issues).
 
-```sh
-pnpm test                           # frontend unit tests (layout, bitmap)
-cd src-tauri && cargo test          # protocol, status parsing, model files, job decoding
-cd src-tauri && cargo clippy --all-targets
-```
+## For developers
 
-Contributions of model files, protocols (ESC/POS, ZPL, EPL, …) and status dialects are
-very welcome.
+Building from source, how printing works under the hood and how releases are made:
+[docs/development.md](docs/development.md). Adding support for another printer:
+[docs/adding-a-printer.md](docs/adding-a-printer.md).
 
 ## License
 
-[MIT](LICENSE). Printer and vendor names belong to their respective owners; this project
-is not affiliated with Phomemo, Vevor or any other manufacturer.
+[MIT](LICENSE). Printer and vendor names belong to their owners; this project is not
+affiliated with Phomemo, Vevor or any other manufacturer.
