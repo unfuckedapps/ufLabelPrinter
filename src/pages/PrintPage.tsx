@@ -56,10 +56,10 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
         <span className="truncate text-[13px] font-medium" title={doc.path ?? doc.name}>
           {doc.name}
         </span>
-        <span className="flex items-center gap-1.5 text-[11px] text-faint">
-          {t.plural("documents.pages", doc.source.pageCount)}
+        <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-faint">
+          <span className="whitespace-nowrap">{t.plural("documents.pages", doc.source.pageCount)}</span>
           {doc.printedAt && (
-            <span className="flex items-center gap-0.5 text-ok">
+            <span className="flex items-center gap-0.5 whitespace-nowrap text-ok">
               <Check className="size-3" />
               {t("documents.printedAt", { time: t.time(doc.printedAt) })}
             </span>
