@@ -2,9 +2,10 @@ import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
+import { translator } from "../i18n";
 import { inkBounds, toBitmap } from "./bitmap";
 import { place, rotatedSize, type Box, type LabelGeometry, type Placement } from "./layout";
-import { labelDots, mmToDots } from "./printers";
+import { labelDots, mmToDots, paperSize } from "./printers";
 import type { Bitmap, LayoutOptions, Printer, Rotation } from "./types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
@@ -269,9 +270,10 @@ export function renderTestLabel(printer: Printer): Bitmap {
   ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
   ctx.fillText(printer.paper.name, width / 2, height / 2 - 23 * dpmm);
   ctx.font = `${Math.round(3 * dpmm)}px -apple-system, Helvetica, sans-serif`;
-  const size = `${printer.widthMm} × ${printer.heightMm} mm · ${printer.dpi} dpi`;
-  ctx.fillText(size.replace(/\./g, ","), width / 2, height / 2 - 12 * dpmm);
-  ctx.fillText(`Dichte ${printer.density ?? "Standard"}`, width / 2, height / 2 - 8 * dpmm);
+  const t = translator();
+  ctx.fillText(`${paperSize(printer)} · ${printer.dpi} dpi`, width / 2, height / 2 - 12 * dpmm);
+  const density = printer.density ?? t("testLabel.printerDefault");
+  ctx.fillText(t("testLabel.density", { value: density }), width / 2, height / 2 - 8 * dpmm);
 
   return toBitmap(ctx.getImageData(0, 0, canvas.width, canvas.height), 128, false);
 }

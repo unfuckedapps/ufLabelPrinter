@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
+import { describeError, translator } from "../i18n";
 import { jobSettings } from "./printers";
 import type { AppConfig, Bitmap, Devices, ModelRegistry, Printer, PrinterProfile, PrinterStatus } from "./types";
 
@@ -79,9 +80,7 @@ export function onJobProgress(handler: (progress: JobProgress) => void): Promise
   return listen<JobProgress>("job-progress", (event) => handler(event.payload));
 }
 
-/** Tauri rejects with the serialized Rust error, which is a plain string. */
+/** Tauri rejects with the serialized Rust error (`{ code, detail, ... }`), translated here. */
 export function errorMessage(err: unknown): string {
-  if (typeof err === "string") return err;
-  if (err instanceof Error) return err.message;
-  return JSON.stringify(err);
+  return describeError(translator(), err);
 }

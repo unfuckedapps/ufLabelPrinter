@@ -65,10 +65,12 @@ pnpm tauri build    # build Thermalprinter.app and a .dmg
 
 On first start, every USB label printer that is connected is set up automatically.
 Bluetooth printers have to be paired in System Settings first. After that they show
-up under **Drucker → Geräte hinzufügen**. macOS exposes paired Bluetooth Classic
+up under **Printers → Add devices**. macOS exposes paired Bluetooth Classic
 printers as serial ports (`/dev/cu.<name>`), which is all the app needs.
 
-> The UI is currently in German. Translations are welcome.
+The UI is available in English, German, French and Spanish (switch it in the toolbar).
+To add a language, copy `src/i18n/en.ts`, translate it and register it in
+`src/i18n/index.tsx`. TypeScript and `pnpm test` make sure no key is missing.
 
 ## How it works
 
@@ -103,13 +105,16 @@ printer instead.
 - **The printer stops halfway through a label and beeps.** The vendor apps run into this
   too. The most likely cause is the power drawn by dense black areas, such as big
   barcodes printed large. Try a lower **speed** (2–3 in/s) or a lower density in the
-  printer settings, or keep *Weiße Ränder abschneiden* off so the label prints a little
+  printer settings, or keep *Trim white borders* off so the label prints a little
   smaller.
-- **"Der Drucker ist belegt".** Another program is holding the USB device, usually
+- **"The printer is busy".** Another program is holding the USB device, usually
   Labelife or a running CUPS job. Quit it and try again.
 - **Content is offset or cut at the edge.** Print the test label and adjust
-  *Feinjustierung*. After changing the roll, run *Sensor kalibrieren* once.
-- **The label comes out upside down.** Turn on *Ausdruck um 180° drehen*.
+  *Fine tuning*. After changing the roll, run *Calibrate sensor* once.
+- **The label comes out upside down.** Turn on *Rotate print by 180°*.
+- **Bluetooth is slow or drops.** Models with `"compression": "lzo"` send labels
+  compressed (about 15 KB instead of 270 KB). A transfer that makes no progress for 10 s
+  is aborted, and you can cancel any job from the progress bar.
 
 ## Development
 

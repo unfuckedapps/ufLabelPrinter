@@ -3,8 +3,9 @@ import { NavLink, Outlet, useNavigate } from "react-router";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FileDown, Printer, RefreshCw, ScrollText, Settings2 } from "lucide-react";
+import { FileDown, Languages, Printer, RefreshCw, ScrollText, Settings2 } from "lucide-react";
 
+import { LANGUAGES, useT, type Language } from "../i18n";
 import { takePendingFiles } from "../lib/api";
 import { useConfig } from "../lib/config";
 import { useDocuments } from "../lib/documents";
@@ -12,14 +13,14 @@ import { connectionKind } from "../lib/printers";
 import { summarize, useStatus } from "../lib/status";
 import { StatusDot } from "./ui";
 
-export const OPEN_FILTERS = [{ name: "Etiketten", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }];
+export const OPEN_FILTERS = [{ name: "PDF / PNG / JPG / WebP", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }];
 
 export async function pickFiles(): Promise<string[]> {
   const picked = await open({ multiple: true, filters: OPEN_FILTERS });
   return picked ?? [];
 }
 
-/** Accepts files from drag & drop, ⌘O and Finder ("Öffnen mit"). */
+/** Accepts files from drag & drop, ⌘O and Finder ("Open With"). */
 function useFileIntake(): boolean {
   const { addPaths } = useDocuments();
   const navigate = useNavigate();
@@ -69,11 +70,12 @@ const PICKER =
 function PrinterPicker() {
   const { config, printers, activePrinter, setActivePrinter, updatePrinter } = useConfig();
   const status = useStatus();
+  const t = useT();
 
   if (!activePrinter) {
     return (
-      <NavLink to="/drucker" className="text-xs font-medium text-accent hover:underline">
-        Drucker einrichten
+      <NavLink to="/printers" className="text-xs font-medium text-accent hover:underline">
+        {t("header.setUpPrinter")}
       </NavLink>
     );
   }
@@ -85,7 +87,7 @@ function PrinterPicker() {
     <div className="flex items-center gap-2">
       <button
         className="flex items-center gap-1.5 rounded px-1.5 py-1 text-xs text-muted hover:bg-sunken hover:text-ink"
-        title={entry.error ?? "Status aktualisieren"}
+        title={entry.error ?? t("header.refreshStatus")}
         onClick={() => void status.refresh(activePrinter)}
       >
         <StatusDot tone={entry.checking && !entry.status ? "busy" : summary.tone} />
@@ -94,7 +96,7 @@ function PrinterPicker() {
       </button>
       <select
         className={PICKER}
-        title="Aktiver Drucker"
+        title={t("header.activePrinter")}
         value={activePrinter.id}
         onChange={(e) => setActivePrinter(e.target.value)}
       >
@@ -106,7 +108,7 @@ function PrinterPicker() {
       </select>
       <select
         className={PICKER}
-        title="Eingelegtes Papier"
+        title={t("header.loadedPaper")}
         value={activePrinter.paperId}
         onChange={(e) => updatePrinter(activePrinter.id, { paperId: e.target.value })}
       >
@@ -117,6 +119,27 @@ function PrinterPicker() {
         ))}
       </select>
     </div>
+  );
+}
+
+function LanguagePicker() {
+  const { config, setLanguage } = useConfig();
+  const t = useT();
+  return (
+    <label className="flex items-center gap-1 text-muted" title={t("header.language")}>
+      <Languages className="size-3.5" />
+      <select
+        className="h-7 rounded-md bg-transparent pr-1 text-xs font-medium outline-none hover:text-ink"
+        value={config.language}
+        onChange={(e) => setLanguage(e.target.value as Language)}
+      >
+        {LANGUAGES.map((l) => (
+          <option key={l.value} value={l.value}>
+            {l.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -139,6 +162,7 @@ function Tab({ to, icon, children }: { to: string; icon: React.ReactNode; childr
 
 export function AppLayout() {
   const dragging = useFileIntake();
+  const t = useT();
 
   return (
     <div className="flex h-full flex-col">
@@ -151,17 +175,18 @@ export function AppLayout() {
         </div>
         <nav className="flex rounded-lg bg-sunken p-0.5">
           <Tab to="/" icon={<Printer className="size-3.5" />}>
-            Drucken
+            {t("nav.print")}
           </Tab>
-          <Tab to="/drucker" icon={<Settings2 className="size-3.5" />}>
-            Drucker
+          <Tab to="/printers" icon={<Settings2 className="size-3.5" />}>
+            {t("nav.printers")}
           </Tab>
-          <Tab to="/papier" icon={<ScrollText className="size-3.5" />}>
-            Papier
+          <Tab to="/paper" icon={<ScrollText className="size-3.5" />}>
+            {t("nav.paper")}
           </Tab>
         </nav>
         <div className="flex-1" />
         <PrinterPicker />
+        <LanguagePicker />
       </header>
 
       <main className="relative min-h-0 flex-1">
@@ -170,8 +195,8 @@ export function AppLayout() {
           <div className="pointer-events-none absolute inset-3 z-40 flex items-center justify-center rounded-xl border-2 border-dashed border-accent bg-accent-soft/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2 text-accent">
               <FileDown className="size-10" />
-              <span className="text-base font-semibold">Loslassen zum Öffnen</span>
-              <span className="text-xs">PDF, PNG, JPG oder WebP</span>
+              <span className="text-base font-semibold">{t("drop.release")}</span>
+              <span className="text-xs">{t("drop.formats")}</span>
             </div>
           </div>
         )}

@@ -2,6 +2,7 @@ import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { useRouteError, isRouteErrorResponse, Link } from "react-router";
 import { ClipboardCopy, RotateCcw, TriangleAlert } from "lucide-react";
 
+import { translator } from "../i18n";
 import { Button } from "./ui";
 
 function describe(error: unknown): { message: string; details: string } {
@@ -10,31 +11,28 @@ function describe(error: unknown): { message: string; details: string } {
   }
   if (error instanceof Error) return { message: error.message, details: error.stack ?? error.message };
   if (typeof error === "string") return { message: error, details: error };
-  return { message: "Unbekannter Fehler", details: JSON.stringify(error, null, 2) };
+  return { message: "Unknown error", details: JSON.stringify(error, null, 2) };
 }
 
 /** Points the user at the most likely fix for errors we have seen before. */
 function hintFor(message: string): string | null {
-  if (/pdf|InvalidPDF|password/i.test(message)) {
-    return "Das Dokument konnte nicht gelesen werden. Ist die PDF beschädigt oder passwortgeschützt? Lade das Etikett ggf. neu herunter.";
-  }
-  if (/canvas|memory|allocation/i.test(message)) {
-    return "Beim Rendern ist der Speicher ausgegangen. Sehr große Bilder vorher verkleinern oder weniger Dokumente gleichzeitig öffnen.";
-  }
-  if (/invoke|ipc|__TAURI/i.test(message)) {
-    return "Die Verbindung zum App-Kern ist unterbrochen. Ein Neustart der App behebt das in der Regel.";
-  }
+  const t = translator();
+  if (/pdf|InvalidPDF|password/i.test(message)) return t("errorScreen.hintPdf");
+  if (/canvas|memory|allocation/i.test(message)) return t("errorScreen.hintMemory");
+  if (/invoke|ipc|__TAURI/i.test(message)) return t("errorScreen.hintIpc");
   return null;
 }
 
 function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void }) {
+  // The boundary sits above the i18n provider, so it reads the current translator directly.
+  const t = translator();
   const { message, details } = describe(error);
   const [copied, setCopied] = useState(false);
   const hint = hintFor(message);
   const report = [
     `Thermalprinter ${__APP_VERSION__}`,
-    `Zeit: ${new Date().toISOString()}`,
-    `Ort: ${window.location.hash || "/"}`,
+    `Time: ${new Date().toISOString()}`,
+    `Location: ${window.location.hash || "/"}`,
     `System: ${navigator.userAgent}`,
     "",
     details,
@@ -48,11 +46,8 @@ function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void 
             <TriangleAlert className="size-6" />
           </div>
           <div className="flex flex-col gap-1">
-            <h1 className="text-lg font-semibold">Da ist etwas schiefgelaufen</h1>
-            <p className="text-muted">
-              Die Oberfläche ist auf einen unerwarteten Fehler gestoßen. Deine Druckereinstellungen sind gespeichert
-              und gehen dabei nicht verloren.
-            </p>
+            <h1 className="text-lg font-semibold">{t("errorScreen.title")}</h1>
+            <p className="text-muted">{t("errorScreen.body")}</p>
           </div>
         </div>
 
@@ -62,7 +57,7 @@ function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void 
         </div>
 
         <details className="group">
-          <summary className="cursor-pointer text-xs text-muted hover:text-ink">Technische Details</summary>
+          <summary className="cursor-pointer text-xs text-muted hover:text-ink">{t("errorScreen.details")}</summary>
           <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-sunken p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted select-text">
             {report}
           </pre>
@@ -71,10 +66,10 @@ function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void 
         <div className="flex flex-wrap gap-2">
           {onReset && (
             <Button variant="primary" icon={<RotateCcw className="size-4" />} onClick={onReset}>
-              Erneut versuchen
+              {t("errorScreen.retry")}
             </Button>
           )}
-          <Button onClick={() => window.location.reload()}>App neu laden</Button>
+          <Button onClick={() => window.location.reload()}>{t("errorScreen.reload")}</Button>
           <Button
             variant="ghost"
             icon={<ClipboardCopy className="size-4" />}
@@ -82,7 +77,7 @@ function ErrorScreen({ error, onReset }: { error: unknown; onReset?: () => void 
               void navigator.clipboard.writeText(report).then(() => setCopied(true));
             }}
           >
-            {copied ? "Kopiert" : "Fehlerbericht kopieren"}
+            {copied ? t("errorScreen.copied") : t("errorScreen.copy")}
           </Button>
         </div>
       </div>
@@ -99,7 +94,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: u
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
-    console.error("Unbehandelter Fehler:", error, info.componentStack);
+    console.error("Unhandled error:", error, info.componentStack);
   }
 
   render() {
@@ -118,7 +113,7 @@ export function RouteError() {
       <ErrorScreen error={error} />
       <p className="pb-6 text-center text-xs text-muted">
         <Link to="/" className="text-accent hover:underline">
-          Zurück zum Drucken
+          {translator()("errorScreen.back")}
         </Link>
       </p>
     </div>

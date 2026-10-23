@@ -3,6 +3,7 @@ import { Copy, Plus, ScrollText, Trash2 } from "lucide-react";
 
 import { PaperFields } from "../components/PaperFields";
 import { Button, Section } from "../components/ui";
+import { useT } from "../i18n";
 import { useConfig } from "../lib/config";
 import { newPaper, paperSummary } from "../lib/printers";
 import type { PaperProfile } from "../lib/types";
@@ -10,6 +11,7 @@ import type { PaperProfile } from "../lib/types";
 function PaperEditor({ paper }: { paper: PaperProfile }) {
   const { config, printers, activePrinter, addPaper, updatePaper, removePaper, updatePrinter } = useConfig();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const t = useT();
   useEffect(() => setConfirmDelete(false), [paper.id]);
 
   const users = printers.filter((p) => p.paperId === paper.id);
@@ -22,17 +24,19 @@ function PaperEditor({ paper }: { paper: PaperProfile }) {
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="truncate text-lg font-semibold">{paper.name}</h2>
           <span className="text-xs text-muted">
-            {users.length > 0 ? `Eingelegt in: ${users.map((p) => p.name).join(", ")}` : "In keinem Drucker eingelegt"}
+            {users.length > 0
+              ? t("paper.loadedIn", { printers: users.map((p) => p.name).join(", ") })
+              : t("paper.notLoaded")}
           </span>
         </div>
         {activePrinter && !loadedInActive && (
           <Button size="sm" variant="primary" onClick={() => updatePrinter(activePrinter.id, { paperId: paper.id })}>
-            In {activePrinter.name} einlegen
+            {t("paper.loadInto", { printer: activePrinter.name })}
           </Button>
         )}
       </div>
 
-      <Section title="Eigenschaften">
+      <Section title={t("paper.properties")}>
         <PaperFields paper={paper} onChange={(patch) => updatePaper(paper.id, patch)} />
       </Section>
 
@@ -40,21 +44,22 @@ function PaperEditor({ paper }: { paper: PaperProfile }) {
         <Button
           size="sm"
           icon={<Copy className="size-3.5" />}
-          onClick={() => addPaper({ ...paper, id: crypto.randomUUID(), name: `${paper.name} (Kopie)` })}
+          onClick={() => addPaper({ ...paper, id: crypto.randomUUID(), name: t("paper.copyName", { name: paper.name }) })}
         >
-          Duplizieren
+          {t("paper.duplicate")}
         </Button>
         <div className="flex-1" />
         {confirmDelete && replacement ? (
           <>
             <span className="text-xs text-muted">
-              {users.length > 0 ? `Drucker wechseln auf „${replacement.name}“. ` : ""}Wirklich löschen?
+              {users.length > 0 ? `${t("paper.switchTo", { name: replacement.name })} ` : ""}
+              {t("paper.reallyDelete")}
             </span>
             <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-              Abbrechen
+              {t("printers.editor.cancel")}
             </Button>
             <Button size="sm" variant="danger" onClick={() => removePaper(paper.id, replacement.id)}>
-              Löschen
+              {t("paper.delete")}
             </Button>
           </>
         ) : (
@@ -63,10 +68,10 @@ function PaperEditor({ paper }: { paper: PaperProfile }) {
             variant="danger"
             icon={<Trash2 className="size-3.5" />}
             disabled={!replacement}
-            title={replacement ? undefined : "Mindestens ein Papier muss bleiben"}
+            title={replacement ? undefined : t("paper.keepOne")}
             onClick={() => setConfirmDelete(true)}
           >
-            Löschen
+            {t("paper.delete")}
           </Button>
         )}
       </div>
@@ -76,6 +81,7 @@ function PaperEditor({ paper }: { paper: PaperProfile }) {
 
 export function PapersPage() {
   const { config, printers, addPaper } = useConfig();
+  const t = useT();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = config.papers.find((p) => p.id === selectedId) ?? config.papers[0] ?? null;
 
@@ -83,19 +89,19 @@ export function PapersPage() {
     <div className="grid h-full grid-cols-[320px_1fr]">
       <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto border-r border-line p-4">
         <Section
-          title="Papierprofile"
+          title={t("paper.title")}
           aside={
             <Button
               size="sm"
               variant="ghost"
               icon={<Plus className="size-3.5" />}
               onClick={() => {
-                const paper = newPaper({ name: "Neues Papier" });
+                const paper = newPaper({ name: t("paper.newName") });
                 addPaper(paper);
                 setSelectedId(paper.id);
               }}
             >
-              Neu
+              {t("paper.new")}
             </Button>
           }
         >
@@ -120,7 +126,7 @@ export function PapersPage() {
                         className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent"
                         title={users.map((p) => p.name).join(", ")}
                       >
-                        {users.length === 1 ? users[0].name : `${users.length} Drucker`}
+                        {users.length === 1 ? users[0].name : t.plural("paper.printers", users.length)}
                       </span>
                     )}
                   </button>
@@ -130,8 +136,7 @@ export function PapersPage() {
           </ul>
         </Section>
         <p className="px-1 text-[11px] leading-relaxed text-faint">
-          Lege für jede Etikettenrolle ein Profil an. Beim Rollenwechsel genügt dann ein Klick oben rechts in der
-          Kopfzeile.
+          {t("paper.hint")}
         </p>
       </aside>
 

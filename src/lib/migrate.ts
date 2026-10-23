@@ -1,3 +1,4 @@
+import { isLanguage } from "../i18n";
 import { DEFAULT_CONFIG, DEFAULT_LAYOUT, DEFAULT_PAPERS, ensurePaper, genericModelId } from "./printers";
 import type { AppConfig, MediaType, PrinterProfile } from "./types";
 
@@ -11,8 +12,9 @@ interface PrinterProfileV1 extends Omit<PrinterProfile, "paperId"> {
   gapOffsetMm?: number;
 }
 
-export type StoredConfig = Omit<Partial<AppConfig>, "version" | "printers"> & {
+export type StoredConfig = Omit<Partial<AppConfig>, "version" | "printers" | "language"> & {
   version?: number;
+  language?: string;
   printers?: PrinterProfileV1[];
 };
 
@@ -40,6 +42,7 @@ export function normalize(raw: StoredConfig | null): AppConfig {
 
   return {
     version: 2,
+    language: isLanguage(raw.language) ? raw.language : "en",
     printers,
     papers,
     activePrinterId: raw.activePrinterId ?? null,

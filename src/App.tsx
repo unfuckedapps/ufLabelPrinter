@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import { createHashRouter, RouterProvider } from "react-router";
 
 import { AppLayout } from "./components/AppLayout";
 import { RouteError } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toasts";
-import { ConfigProvider } from "./lib/config";
+import { I18nProvider } from "./i18n";
+import { ConfigProvider, useConfig } from "./lib/config";
 import { DocumentsProvider } from "./lib/documents";
 import { StatusProvider } from "./lib/status";
 import { NotFound } from "./pages/NotFound";
@@ -18,23 +20,31 @@ const router = createHashRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <PrintPage /> },
-      { path: "drucker", element: <PrintersPage /> },
-      { path: "papier", element: <PapersPage /> },
+      { path: "printers", element: <PrintersPage /> },
+      { path: "paper", element: <PapersPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },
 ]);
 
+/** The language is part of the saved config, so translations sit below the config. */
+function Localized({ children }: { children: ReactNode }) {
+  const { config } = useConfig();
+  return <I18nProvider language={config.language}>{children}</I18nProvider>;
+}
+
 export default function App() {
   return (
-    <ToastProvider>
-      <ConfigProvider>
-        <StatusProvider>
-          <DocumentsProvider>
-            <RouterProvider router={router} />
-          </DocumentsProvider>
-        </StatusProvider>
-      </ConfigProvider>
-    </ToastProvider>
+    <ConfigProvider>
+      <Localized>
+        <ToastProvider>
+          <StatusProvider>
+            <DocumentsProvider>
+              <RouterProvider router={router} />
+            </DocumentsProvider>
+          </StatusProvider>
+        </ToastProvider>
+      </Localized>
+    </ConfigProvider>
   );
 }

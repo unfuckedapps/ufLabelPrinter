@@ -18,6 +18,7 @@ import { LabelPreview } from "../components/LabelPreview";
 import { pickFiles } from "../components/AppLayout";
 import { useToast } from "../components/Toasts";
 import { Button, NumberInput, Section, Segmented, Toggle } from "../components/ui";
+import { useT } from "../i18n";
 import { cancelJob, errorMessage, onJobProgress, printJob, type PrintPage as JobPage } from "../lib/api";
 import { useConfig } from "../lib/config";
 import { useDocuments, type LabelDocument } from "../lib/documents";
@@ -29,12 +30,9 @@ function labelCount(docs: LabelDocument[]): number {
   return docs.reduce((sum, d) => sum + d.source.pageCount * d.copies, 0);
 }
 
-function plural(n: number): string {
-  return n === 1 ? "1 Etikett" : `${n} Etiketten`;
-}
-
 function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
   const { setActive, update, remove } = useDocuments();
+  const t = useT();
   const isPdf = doc.name.toLowerCase().endsWith(".pdf");
   const Icon = isPdf ? FileText : FileImage;
 
@@ -49,7 +47,7 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
         type="checkbox"
         className="size-3.5 accent-[var(--accent)]"
         checked={doc.selected}
-        title="Beim Drucken aller Etiketten berücksichtigen"
+        title={t("documents.includeInBatch")}
         onClick={(e) => e.stopPropagation()}
         onChange={(e) => update(doc.id, { selected: e.target.checked })}
       />
@@ -59,11 +57,11 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
           {doc.name}
         </span>
         <span className="flex items-center gap-1.5 text-[11px] text-faint">
-          {doc.source.pageCount} {doc.source.pageCount === 1 ? "Seite" : "Seiten"}
+          {t.plural("documents.pages", doc.source.pageCount)}
           {doc.printedAt && (
             <span className="flex items-center gap-0.5 text-ok">
               <Check className="size-3" />
-              gedruckt {new Date(doc.printedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+              {t("documents.printedAt", { time: t.time(doc.printedAt) })}
             </span>
           )}
         </span>
@@ -73,17 +71,17 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
           className="p-1 text-faint hover:text-ink disabled:opacity-30"
           disabled={doc.copies <= 1}
           onClick={() => update(doc.id, { copies: doc.copies - 1 })}
-          aria-label="Weniger Kopien"
+          aria-label={t("documents.fewerCopies")}
         >
           <Minus className="size-3" />
         </button>
-        <span className="tabular w-5 text-center text-[11px] font-medium" title="Kopien">
+        <span className="tabular w-5 text-center text-[11px] font-medium" title={t("documents.copies")}>
           {doc.copies}
         </span>
         <button
           className="p-1 text-faint hover:text-ink"
           onClick={() => update(doc.id, { copies: Math.min(99, doc.copies + 1) })}
-          aria-label="Mehr Kopien"
+          aria-label={t("documents.moreCopies")}
         >
           <Plus className="size-3" />
         </button>
@@ -94,7 +92,7 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
           e.stopPropagation();
           remove(doc.id);
         }}
-        aria-label="Entfernen"
+        aria-label={t("documents.remove")}
       >
         <X className="size-3.5" />
       </button>
@@ -103,37 +101,54 @@ function DocumentRow({ doc, active }: { doc: LabelDocument; active: boolean }) {
 }
 
 function LayoutPanel({ layout, setLayout }: { layout: LayoutOptions; setLayout: (p: Partial<LayoutOptions>) => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-6">
-      <Section title="Größe">
+      <Section title={t("layout.size")}>
         <Segmented
           value={layout.fit}
           onChange={(fit) => setLayout({ fit })}
           options={[
-            { value: "contain", label: <><Scaling className="size-3.5" /> Einpassen</>, title: "Auf das Etikett skalieren" },
-            { value: "actual", label: "100 %", title: "Originalgröße, Überstand wird abgeschnitten" },
+            {
+              value: "contain",
+              label: (
+                <>
+                  <Scaling className="size-3.5" /> {t("layout.fit")}
+                </>
+              ),
+              title: t("layout.fitTitle"),
+            },
+            { value: "actual", label: t("layout.actual"), title: t("layout.actualTitle") },
           ]}
         />
         <Toggle
           checked={layout.trim}
           onChange={(trim) => setLayout({ trim })}
-          label="Weiße Ränder abschneiden"
-          hint="Nutzt die Etikettenfläche besser aus – Inhalt wird größer"
+          label={t("layout.trim")}
+          hint={t("layout.trimHint")}
         />
         <label className="flex items-center justify-between gap-3">
-          <span className="text-[13px]">Rand</span>
+          <span className="text-[13px]">{t("layout.margin")}</span>
           <div className="w-24">
             <NumberInput value={layout.marginMm} onChange={(marginMm) => setLayout({ marginMm })} unit="mm" min={0} max={20} step={0.5} />
           </div>
         </label>
       </Section>
 
-      <Section title="Drehung">
+      <Section title={t("layout.rotation")}>
         <Segmented
           value={layout.rotation}
           onChange={(rotation) => setLayout({ rotation })}
           options={[
-            { value: "auto", label: <><RotateCw className="size-3.5" /> Auto</>, title: "Dreht quer liegende Etiketten automatisch" },
+            {
+              value: "auto",
+              label: (
+                <>
+                  <RotateCw className="size-3.5" /> {t("layout.auto")}
+                </>
+              ),
+              title: t("layout.autoTitle"),
+            },
             { value: 0, label: "0°" },
             { value: 90, label: "90°" },
             { value: 180, label: "180°" },
@@ -143,7 +158,7 @@ function LayoutPanel({ layout, setLayout }: { layout: LayoutOptions; setLayout: 
       </Section>
 
       <Section
-        title="Schwarzweiß"
+        title={t("layout.blackWhite")}
         aside={<span className="tabular text-[11px] text-faint">{Math.round((layout.threshold / 255) * 100)} %</span>}
       >
         <label className="flex flex-col gap-1.5">
@@ -155,15 +170,15 @@ function LayoutPanel({ layout, setLayout }: { layout: LayoutOptions; setLayout: 
             onChange={(e) => setLayout({ threshold: Number(e.target.value) })}
           />
           <span className="flex justify-between text-[11px] text-faint">
-            <span>heller</span>
-            <span>dunkler</span>
+            <span>{t("layout.lighter")}</span>
+            <span>{t("layout.darker")}</span>
           </span>
         </label>
         <Toggle
           checked={layout.dither}
           onChange={(dither) => setLayout({ dither })}
-          label="Graustufen rastern"
-          hint="Für Fotos und Logos. Bei Versandetiketten aus lassen – Barcodes werden sonst unscharf."
+          label={t("layout.dither")}
+          hint={t("layout.ditherHint")}
         />
       </Section>
     </div>
@@ -177,6 +192,7 @@ function JobProgressBar({
   job: { sent: number; total: number };
   onCancel: () => void;
 }) {
+  const t = useT();
   const percent = job.total > 0 ? Math.round((job.sent / job.total) * 100) : 0;
   return (
     <div className="flex flex-col gap-1.5">
@@ -186,11 +202,15 @@ function JobProgressBar({
       <div className="tabular flex items-center justify-between text-[11px] text-muted">
         <span>
           {job.total === 0
-            ? "Bereite vor …"
-            : `Sende ${percent} % · ${Math.round(job.sent / 1024)} / ${Math.round(job.total / 1024)} KB`}
+            ? t("print.preparing")
+            : t("print.sending", {
+                percent,
+                sent: Math.round(job.sent / 1024),
+                total: Math.round(job.total / 1024),
+              })}
         </span>
         <button className="font-medium text-err hover:underline" onClick={onCancel}>
-          Abbrechen
+          {t("print.cancel")}
         </button>
       </div>
     </div>
@@ -199,6 +219,7 @@ function JobProgressBar({
 
 function EmptyState() {
   const { addPaths } = useDocuments();
+  const t = useT();
   return (
     <div className="flex h-full items-center justify-center p-10">
       <button
@@ -211,10 +232,8 @@ function EmptyState() {
           <span className="mt-auto h-6 rounded-sm bg-[repeating-linear-gradient(90deg,var(--ink)_0_2px,transparent_2px_4px,var(--ink)_4px_5px,transparent_5px_8px)] opacity-70" />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-base font-semibold">Versandetikett hierher ziehen</span>
-          <span className="text-muted">
-            oder klicken zum Auswählen (⌘O) – PDF, PNG, JPG. Mehrere Dateien auf einmal gehen auch.
-          </span>
+          <span className="text-base font-semibold">{t("empty.title")}</span>
+          <span className="text-muted">{t("empty.subtitle")}</span>
         </div>
       </button>
     </div>
@@ -226,6 +245,7 @@ export function PrintPage() {
   const documents = useDocuments();
   const status = useStatus();
   const toast = useToast();
+  const t = useT();
   const [printing, setPrinting] = useState<"all" | "current" | null>(null);
   const [job, setJob] = useState<{ id: string; sent: number; total: number } | null>(null);
 
@@ -256,9 +276,9 @@ export function PrintPage() {
         setJob({ id: jobId, sent: 0, total: 0 });
         await printJob(printer, pages, jobId);
         documents.markPrinted(targets.map((d) => d.id));
-        toast.success(`${plural(labelCount(targets))} an ${printer.name} gesendet`);
+        toast.success(t.plural("print.sent", labelCount(targets), { printer: printer.name }));
       } catch (err) {
-        toast.error(`Druck fehlgeschlagen: ${errorMessage(err)}`);
+        toast.error(t("print.failed", { error: errorMessage(err) }));
       } finally {
         setJob(null);
         setPrinting(null);
@@ -266,7 +286,7 @@ export function PrintPage() {
         if (printer.connection.type === "usb") void status.refresh(printer);
       }
     },
-    [config.layout, documents, status, toast],
+    [config.layout, documents, status, toast, t],
   );
 
   // ⌘P prints everything that is ticked.
@@ -287,9 +307,9 @@ export function PrintPage() {
     <div className="grid h-full grid-cols-[minmax(240px,300px)_1fr_280px]">
       <aside className="flex min-h-0 flex-col border-r border-line">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-[11px] font-semibold tracking-wider text-faint uppercase">Dokumente</h2>
+          <h2 className="text-[11px] font-semibold tracking-wider text-faint uppercase">{t("documents.title")}</h2>
           <Button size="sm" variant="ghost" icon={<FolderOpen className="size-3.5" />} onClick={() => void pickFiles().then(documents.addPaths)}>
-            Öffnen
+            {t("documents.open")}
           </Button>
         </div>
         <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2">
@@ -298,14 +318,14 @@ export function PrintPage() {
           ))}
           {docs.length === 0 && (
             <li className="px-3 py-6 text-center text-xs leading-relaxed text-faint">
-              Noch nichts geöffnet. Dateien einfach ins Fenster ziehen.
+              {t("documents.empty")}
             </li>
           )}
         </ul>
         {printedCount > 0 && (
           <div className="border-t border-line p-2">
             <Button size="sm" variant="ghost" className="w-full" icon={<Trash2 className="size-3.5" />} onClick={documents.removePrinted}>
-              Gedruckte entfernen ({printedCount})
+              {t("documents.removePrinted", { count: printedCount })}
             </Button>
           </div>
         )}
@@ -316,12 +336,10 @@ export function PrintPage() {
           <div className="flex h-full items-center justify-center p-10 text-center">
             <div className="flex max-w-sm flex-col items-center gap-3">
               <PrinterIcon className="size-8 text-faint" />
-              <p className="text-base font-semibold">Noch kein Drucker eingerichtet</p>
-              <p className="text-muted">
-                Schließe den Drucker per USB an oder kopple ihn per Bluetooth und füge ihn dann hinzu.
-              </p>
-              <Link to="/drucker" className="font-medium text-accent hover:underline">
-                Drucker einrichten →
+              <p className="text-base font-semibold">{t("noPrinter.title")}</p>
+              <p className="text-muted">{t("noPrinter.body")}</p>
+              <Link to="/printers" className="font-medium text-accent hover:underline">
+                {t("noPrinter.action")}
               </Link>
             </div>
           </div>
@@ -351,7 +369,7 @@ export function PrintPage() {
             disabled={!activePrinter || selected.length === 0 || printing !== null}
             onClick={() => activePrinter && void print(activePrinter, selected, "all")}
           >
-            {selected.length === 0 ? "Nichts ausgewählt" : `${plural(labelCount(selected))} drucken`}
+            {selected.length === 0 ? t("print.nothingSelected") : t.plural("print.button", labelCount(selected))}
           </Button>
           {active && docs.length > 1 && (
             <Button
@@ -360,14 +378,14 @@ export function PrintPage() {
               disabled={!activePrinter || printing !== null}
               onClick={() => activePrinter && void print(activePrinter, [active], "current")}
             >
-              Nur angezeigtes drucken
+              {t("print.onlyShown")}
             </Button>
           )}
           {job ? (
             <JobProgressBar job={job} onCancel={() => void cancelJob(job.id)} />
           ) : (
             <p className="text-center text-[11px] text-faint">
-              {activePrinter ? `auf ${activePrinter.name} · ⌘P` : "Kein Drucker"}
+              {activePrinter ? t("print.on", { printer: activePrinter.name }) : t("print.noPrinter")}
             </p>
           )}
         </div>

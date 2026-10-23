@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, TriangleAlert } from "lucide-react";
 
+import { useT } from "../i18n";
 import { drawBitmap } from "../lib/bitmap";
 import type { LabelDocument } from "../lib/documents";
 import { formatMm } from "../lib/printers";
@@ -24,6 +25,7 @@ export function LabelPreview({
   printer: Printer;
   layout: LayoutOptions;
 }) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [result, setResult] = useState<RenderedLabel | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,18 +88,18 @@ export function LabelPreview({
             className="rounded p-1 hover:bg-panel hover:text-ink disabled:opacity-30"
             disabled={page === 0}
             onClick={() => onPageChange(page - 1)}
-            aria-label="Vorherige Seite"
+            aria-label={t("preview.previous")}
           >
             <ChevronLeft className="size-4" />
           </button>
           <span className="tabular min-w-20 text-center">
-            Seite {page + 1} von {pageCount}
+            {t("preview.page", { page: page + 1, count: pageCount })}
           </span>
           <button
             className="rounded p-1 hover:bg-panel hover:text-ink disabled:opacity-30"
             disabled={page >= pageCount - 1}
             onClick={() => onPageChange(page + 1)}
-            aria-label="Nächste Seite"
+            aria-label={t("preview.next")}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -112,7 +114,8 @@ export function LabelPreview({
               <span className="text-faint">|</span>
               <span className={result.relativeScale < SMALL_SCALE ? "font-medium text-warn" : ""}>
                 {Math.round(result.relativeScale * 100)} %
-                {result.placement.rotation !== 0 && ` · ${result.placement.rotation}° gedreht`}
+                {result.placement.rotation !== 0 &&
+                  ` · ${t("preview.rotated", { degrees: result.placement.rotation })}`}
               </span>
             </>
           )}
@@ -122,7 +125,7 @@ export function LabelPreview({
       {result && result.relativeScale < SMALL_SCALE && (
         <p className="-mt-2 flex items-center gap-1.5 self-end text-[11px] text-warn">
           <TriangleAlert className="size-3.5" />
-          Stark verkleinert – Barcodes ggf. schlecht lesbar. Größeres Papier oder „Ränder abschneiden“ hilft.
+          {t("preview.shrunk")}
         </p>
       )}
     </div>

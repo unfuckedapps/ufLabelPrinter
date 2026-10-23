@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { translator } from "../i18n";
 import { errorMessage, printerStatus } from "./api";
 import { useConfig } from "./config";
 import type { PrinterProfile, PrinterStatus } from "./types";
@@ -102,16 +103,17 @@ export interface StatusSummary {
 }
 
 export function summarize(printer: PrinterProfile, entry: StatusEntry): StatusSummary {
-  if (entry.printing) return { tone: "busy", text: "Sendet …" };
-  if (entry.error) return { tone: "err", text: "Nicht erreichbar" };
+  const t = translator();
+  if (entry.printing) return { tone: "busy", text: t("status.sending") };
+  if (entry.error) return { tone: "err", text: t("status.unreachable") };
   const s = entry.status;
-  if (s?.printing) return { tone: "busy", text: "Druckt …" };
-  if (!s) return { tone: "idle", text: entry.checking ? "Prüfe …" : "Status unbekannt" };
+  if (s?.printing) return { tone: "busy", text: t("status.printing") };
+  if (!s) return { tone: "idle", text: t(entry.checking ? "status.checking" : "status.unknown") };
   if (!s.connected) {
-    return { tone: "idle", text: printer.connection.type === "cups" ? "Über CUPS" : "Status unbekannt" };
+    return { tone: "idle", text: t(printer.connection.type === "cups" ? "status.viaCups" : "status.unknown") };
   }
-  if (s.coverOpen) return { tone: "err", text: "Deckel offen" };
-  if (s.paper === false) return { tone: "err", text: "Kein Papier" };
-  if (!s.responsive) return { tone: "ok", text: "Verbunden" };
-  return { tone: "ok", text: "Bereit" };
+  if (s.coverOpen) return { tone: "err", text: t("status.coverOpen") };
+  if (s.paper === false) return { tone: "err", text: t("status.noPaper") };
+  if (!s.responsive) return { tone: "ok", text: t("status.connected") };
+  return { tone: "ok", text: t("status.ready") };
 }

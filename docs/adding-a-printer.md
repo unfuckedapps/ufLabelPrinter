@@ -46,10 +46,11 @@ Copy one of the files in [`src-tauri/models/`](../src-tauri/models) and adjust i
 | `speeds`           | no       | Speeds (in/s) offered in the UI.                                                          |
 | `density`          | no       | Range of the density slider.                                                              |
 | `notes`            | no       | Free text for quirks.                                                                     |
+| `compression`      | no       | `"lzo"` if the printer accepts LZO1X bitmaps (TSPL `BITMAP` mode 3). Used over Bluetooth only. |
 
 **Testing without rebuilding:** put the file into
-`~/Library/Application Support/com.unfuckedapps.thermalprinter/models/` (*Drucker →
-Modellordner öffnen*) and press *Neu laden*. If the file is broken, the error is shown
+`~/Library/Application Support/com.unfuckedapps.thermalprinter/models/` (*Printers →
+Open models folder*) and press *Reload*. If the file is broken, the error is shown
 right there.
 
 **Contributing:** put the file into `src-tauri/models/`. It is embedded at build time

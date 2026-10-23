@@ -1,3 +1,4 @@
+import { translator } from "../i18n";
 import type {
   AppConfig,
   Connection,
@@ -17,7 +18,7 @@ export interface PaperPreset {
 }
 
 export const PAPER_PRESETS: PaperPreset[] = [
-  { id: "4x6", label: '4 × 6" (Versandetikett)', widthMm: 101.6, heightMm: 152.4 },
+  { id: "4x6", label: '4 × 6"', widthMm: 101.6, heightMm: 152.4 },
   { id: "100x150", label: "100 × 150 mm", widthMm: 100, heightMm: 150 },
   { id: "100x100", label: "100 × 100 mm", widthMm: 100, heightMm: 100 },
   { id: "4x4", label: '4 × 4"', widthMm: 101.6, heightMm: 101.6 },
@@ -30,23 +31,8 @@ export const PAPER_PRESETS: PaperPreset[] = [
   { id: "40x20", label: "40 × 20 mm", widthMm: 40, heightMm: 20 },
 ];
 
-export const MEDIA_TYPES: { value: MediaType; label: string; hint: string }[] = [
-  {
-    value: "gap",
-    label: "Lückenpapier",
-    hint: "Einzelne Etiketten auf der Rolle, dazwischen eine Lücke",
-  },
-  {
-    value: "blackMark",
-    label: "Schwarze Markierung",
-    hint: "Etiketten werden über eine schwarze Marke auf der Rückseite erkannt",
-  },
-  {
-    value: "continuous",
-    label: "Endlospapier",
-    hint: "Durchgehende Rolle ohne Markierung, Länge wird fest vorgegeben",
-  },
-];
+/** Labels and hints live in the dictionaries under `media.<type>`. */
+export const MEDIA_TYPES: MediaType[] = ["gap", "blackMark", "continuous"];
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
   fit: "contain",
@@ -60,7 +46,7 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
 export const DEFAULT_PAPERS: PaperProfile[] = [
   {
     id: "paper-4x6",
-    name: 'Versandetikett 4 × 6"',
+    name: '4 × 6"',
     widthMm: 101.6,
     heightMm: 152.4,
     mediaType: "gap",
@@ -71,6 +57,7 @@ export const DEFAULT_PAPERS: PaperProfile[] = [
 
 export const DEFAULT_CONFIG: AppConfig = {
   version: 2,
+  language: "en",
   printers: [],
   papers: DEFAULT_PAPERS,
   activePrinterId: null,
@@ -94,12 +81,13 @@ export function paperSize(p: Pick<PaperProfile, "widthMm" | "heightMm">): string
 }
 
 export function paperSummary(p: PaperProfile): string {
+  const t = translator();
   const media =
     p.mediaType === "gap"
-      ? `Lücke ${formatMm(p.gapMm)} mm`
+      ? t("paper.summary.gap", { mm: formatMm(p.gapMm) })
       : p.mediaType === "blackMark"
-        ? `Marke ${formatMm(p.gapMm)} mm`
-        : "Endlos";
+        ? t("paper.summary.mark", { mm: formatMm(p.gapMm) })
+        : t("paper.summary.continuous");
   return `${paperSize(p)} · ${media}`;
 }
 
@@ -206,14 +194,14 @@ export function describeConnection(c: Connection): string {
     case "usb":
       return `USB ${hex(c.vendorId)}:${hex(c.productId)}${c.serial ? ` · ${c.serial}` : ""}`;
     case "serial":
-      return `Bluetooth · ${c.path.replace("/dev/cu.", "")}`;
+      return `${translator()("connection.serial")} · ${c.path.replace("/dev/cu.", "")}`;
     case "cups":
       return `CUPS · ${c.queue}`;
   }
 }
 
 export function connectionKind(c: Connection): string {
-  return { usb: "USB", serial: "Bluetooth", cups: "CUPS" }[c.type];
+  return translator()(`connection.${c.type}`);
 }
 
 export function sameConnection(a: Connection, b: Connection): boolean {
@@ -229,6 +217,7 @@ function hex(n: number): string {
   return n.toString(16).padStart(4, "0");
 }
 
+/** Millimetres with the active language's decimal separator, at most one decimal. */
 export function formatMm(mm: number): string {
-  return Number.isInteger(mm) ? `${mm}` : mm.toFixed(1).replace(".", ",");
+  return translator().number(mm, 1);
 }

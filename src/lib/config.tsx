@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { translator, type Language } from "../i18n";
 import { errorMessage, listDevices, listModels, loadConfig, saveConfig } from "./api";
 import { normalize, type StoredConfig } from "./migrate";
 import { DEFAULT_CONFIG, ensurePaper, genericModelId, modelPaper, newPrinter, resolvePrinter } from "./printers";
@@ -43,6 +44,7 @@ interface ConfigApi {
   /** Printers that had this paper loaded switch to `replacementId`. */
   removePaper(id: string, replacementId: string): void;
   setLayout(patch: Partial<LayoutOptions>): void;
+  setLanguage(language: Language): void;
 }
 
 const ConfigContext = createContext<ConfigApi | null>(null);
@@ -60,7 +62,9 @@ async function detectPrinters(config: AppConfig, registry: ModelRegistry): Promi
     if (!model) continue;
     const ensured = ensurePaper(papers, modelPaper(model));
     papers = ensured.papers;
-    const name = d.cupsQueue?.replace(/_/g, " ") ?? (d.modelId ? model.name : (d.product ?? "USB-Drucker"));
+    const name =
+      d.cupsQueue?.replace(/_/g, " ") ??
+      (d.modelId ? model.name : (d.product ?? translator()("printers.add.usbPrinter")));
     const connection: Connection = { type: "usb", vendorId: d.vendorId, productId: d.productId, serial: d.serial };
     printers.push(newPrinter(name, connection, model, ensured.paperId));
   }
@@ -96,7 +100,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      saveConfig(config).catch((err) => console.error("Konfiguration nicht gespeichert:", errorMessage(err)));
+      saveConfig(config).catch((err) => console.error("Config not saved:", errorMessage(err)));
     }, 300);
   }, [config, ready]);
 
@@ -156,6 +160,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           };
         }),
       setLayout: (patch) => update((c) => ({ ...c, layout: { ...c.layout, ...patch } })),
+      setLanguage: (language) => update((c) => ({ ...c, language })),
     };
   }, [config, ready, models, reloadModels, update]);
 

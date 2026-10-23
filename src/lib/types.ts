@@ -1,3 +1,5 @@
+import type { Language } from "../i18n";
+
 export type Connection =
   | { type: "usb"; vendorId: number; productId: number; serial: string | null }
   | { type: "serial"; path: string }
@@ -59,6 +61,8 @@ export type Printer = PrinterProfile & Omit<PaperProfile, "id" | "name"> & { pap
 
 export interface AppConfig {
   version: 2;
+  /** UI language; English unless the user picked another one. */
+  language: Language;
   printers: PrinterProfile[];
   papers: PaperProfile[];
   activePrinterId: string | null;

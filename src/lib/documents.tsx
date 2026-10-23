@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { useT } from "../i18n";
 import { errorMessage, readDocument } from "./api";
 import { loadSource, type LoadedSource } from "./render";
 import { useToast } from "../components/Toasts";
@@ -36,6 +37,7 @@ function fileName(path: string): string {
 
 export function DocumentsProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
+  const t = useT();
   const [docs, setDocs] = useState<LabelDocument[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState(0);
@@ -71,12 +73,12 @@ export function DocumentsProvider({ children }: { children: ReactNode }) {
           setDocs(docsRef.current);
           lastId = doc.id;
         } catch (err) {
-          toast.error(`${fileName(path)} konnte nicht geöffnet werden: ${errorMessage(err)}`);
+          toast.error(t("documents.openFailed", { name: fileName(path), error: errorMessage(err) }));
         }
       }
       if (lastId) setActive(lastId);
     },
-    [setActive, toast],
+    [setActive, toast, t],
   );
 
   const removeWhere = useCallback((predicate: (d: LabelDocument) => boolean) => {
