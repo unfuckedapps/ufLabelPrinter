@@ -409,7 +409,11 @@ function PrinterEditor({ printer }: { printer: Printer }) {
             disabled={busy !== null}
             icon={<Crosshair className="size-4" />}
             onClick={() =>
-              void run("test", () => printJob(printer, [{ bitmap: renderTestLabel(printer), copies: 1 }]), "Testetikett gesendet")
+              void run(
+                "test",
+                () => printJob(printer, [{ bitmap: renderTestLabel(printer), copies: 1 }], crypto.randomUUID()),
+                "Testetikett gesendet",
+              )
             }
           >
             Testetikett

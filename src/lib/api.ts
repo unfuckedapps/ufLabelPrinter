@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { jobSettings } from "./printers";
 import type { AppConfig, Bitmap, Devices, ModelRegistry, Printer, PrinterProfile, PrinterStatus } from "./types";
@@ -38,9 +39,10 @@ export interface PrintPage {
  * Sends the job as one binary body: `u32 LE json length`, JSON metadata, then all
  * bitmaps back to back (see `commands::parse_job`).
  */
-export function printJob(printer: Printer, pages: PrintPage[]): Promise<void> {
+export function printJob(printer: Printer, pages: PrintPage[], jobId: string): Promise<void> {
   const meta = new TextEncoder().encode(
     JSON.stringify({
+      jobId,
       connection: printer.connection,
       modelId: printer.modelId,
       settings: jobSettings(printer),
@@ -63,6 +65,18 @@ export function printJob(printer: Printer, pages: PrintPage[]): Promise<void> {
   }
 
   return invoke<void>("print_job", body);
+}
+
+export const cancelJob = (jobId: string) => invoke<void>("cancel_job", { jobId });
+
+export interface JobProgress {
+  jobId: string;
+  sent: number;
+  total: number;
+}
+
+export function onJobProgress(handler: (progress: JobProgress) => void): Promise<UnlistenFn> {
+  return listen<JobProgress>("job-progress", (event) => handler(event.payload));
 }
 
 /** Tauri rejects with the serialized Rust error, which is a plain string. */

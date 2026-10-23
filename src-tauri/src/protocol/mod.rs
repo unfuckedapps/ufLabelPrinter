@@ -52,6 +52,21 @@ pub struct JobSettings {
     pub rotate180: bool,
     /// Feed the finished label to the tear bar.
     pub tear: bool,
+    /// Set by the backend from the model, never by the UI.
+    #[serde(skip)]
+    pub compression: Compression,
+}
+
+/// How bitmap data is encoded on the wire.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Compression {
+    #[default]
+    None,
+    /// LZO1X, as Phomemo's Labelife sends it (TSPL `BITMAP` mode 3 with a length field).
+    /// Shrinks a typical shipping label from ~270 KB to a few KB, which matters over
+    /// Bluetooth.
+    Lzo,
 }
 
 /// A 1-bit raster where a set bit means black. Rows are padded to whole bytes.

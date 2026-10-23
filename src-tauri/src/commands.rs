@@ -1,39 +1,47 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{Error, Result};
 use crate::models::{ModelRegistry, PrinterModel};
 use crate::protocol::{self, JobSettings, Page};
 use crate::status::{self, PrinterStatus};
-use crate::transport::{Connection, cups, serial, usb};
+use crate::transport::{Connection, Progress, cups, serial, usb};
 
-/// Serialises device access (two jobs must never interleave on the wire) and remembers
-/// which printers are still busy with a job they already received.
+fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Serialises access per device (two jobs must never interleave on the wire, but a
+/// stalled Bluetooth job must not block the USB printer) and tracks running jobs.
 #[derive(Default)]
 pub struct DeviceState {
-    lock: Mutex<()>,
+    locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    /// Printers still working on a job they already received.
     busy_until: Mutex<HashMap<String, Instant>>,
+    /// Cancel flags of jobs that are being sent, by job id.
+    jobs: Mutex<HashMap<String, Arc<AtomicBool>>>,
 }
 
 impl DeviceState {
-    fn key(connection: &Connection) -> String {
-        serde_json::to_string(connection).unwrap_or_default()
+    fn lock_for(&self, connection: &Connection) -> Arc<Mutex<()>> {
+        locked(&self.locks).entry(connection.key()).or_default().clone()
     }
 
     fn is_busy(&self, connection: &Connection) -> bool {
-        let busy = self.busy_until.lock().unwrap_or_else(|p| p.into_inner());
-        busy.get(&Self::key(connection)).is_some_and(|until| Instant::now() < *until)
+        locked(&self.busy_until)
+            .get(&connection.key())
+            .is_some_and(|until| Instant::now() < *until)
     }
 
     fn mark_busy(&self, connection: &Connection, duration: Duration) {
-        let mut busy = self.busy_until.lock().unwrap_or_else(|p| p.into_inner());
-        busy.insert(Self::key(connection), Instant::now() + duration);
+        locked(&self.busy_until).insert(connection.key(), Instant::now() + duration);
     }
 }
 
@@ -56,13 +64,14 @@ fn model(app: &AppHandle, id: &str) -> Result<PrinterModel> {
 
 async fn with_device<T: Send + 'static>(
     app: &AppHandle,
+    connection: &Connection,
     work: impl FnOnce(&DeviceState) -> Result<T> + Send + 'static,
 ) -> Result<T> {
     let app = app.clone();
+    let lock = app.state::<DeviceState>().lock_for(connection);
     tauri::async_runtime::spawn_blocking(move || {
-        let state = app.state::<DeviceState>();
-        let _guard = state.lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        work(&state)
+        let _guard = locked(&lock);
+        work(&app.state::<DeviceState>())
     })
     .await
     .map_err(|err| Error::Other(err.to_string()))?
@@ -156,13 +165,19 @@ pub async fn printer_status(
     model_id: String,
 ) -> Result<PrinterStatus> {
     let dialect = model(&app, &model_id)?.status.as_deref().and_then(status::get);
-    with_device(&app, move |state| {
+    let printing = PrinterStatus {
+        printing: true,
+        ..PrinterStatus::connected()
+    };
+    let state = app.state::<DeviceState>();
+    // A job is being sent right now; don't queue up behind it.
+    if state.lock_for(&connection).try_lock().is_err() {
+        return Ok(printing);
+    }
+    with_device(&app, &connection.clone(), move |state| {
         // Queries in the middle of a print can make the firmware abort it.
         if state.is_busy(&connection) {
-            return Ok(PrinterStatus {
-                printing: true,
-                ..PrinterStatus::connected()
-            });
+            return Ok(printing);
         }
         connection.status(dialect)
     })
@@ -177,8 +192,8 @@ pub async fn feed_label(
     model_id: String,
 ) -> Result<()> {
     let job = protocol::get(&model(&app, &model_id)?.protocol)?.feed(&settings)?;
-    with_device(&app, move |state| {
-        connection.send(&job)?;
+    with_device(&app, &connection.clone(), move |state| {
+        connection.send(&job, &Progress::silent())?;
         state.mark_busy(&connection, Duration::from_secs(3));
         Ok(())
     })
@@ -193,8 +208,8 @@ pub async fn calibrate(
     model_id: String,
 ) -> Result<()> {
     let job = protocol::get(&model(&app, &model_id)?.protocol)?.calibrate(&settings)?;
-    with_device(&app, move |state| {
-        connection.send(&job)?;
+    with_device(&app, &connection.clone(), move |state| {
+        connection.send(&job, &Progress::silent())?;
         state.mark_busy(&connection, Duration::from_secs(10));
         Ok(())
     })
@@ -212,6 +227,8 @@ struct PageMeta {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JobMeta {
+    /// Chosen by the UI so it can match progress events and cancel the job.
+    job_id: String,
     connection: Connection,
     model_id: String,
     settings: JobSettings,
@@ -259,21 +276,68 @@ fn print_duration(settings: &JobSettings, pages: &[Page]) -> Duration {
     Duration::from_secs_f32(2.0 + labels as f32 * (inches / speed + 1.0))
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JobProgress<'a> {
+    job_id: &'a str,
+    sent: usize,
+    total: usize,
+}
+
+/// Emits `job-progress` events, at most every 100 ms plus the final one.
+fn progress_reporter(app: AppHandle, job_id: String) -> impl Fn(usize, usize) + Sync {
+    let last = Mutex::new(Instant::now() - Duration::from_secs(1));
+    move |sent, total| {
+        let mut last = locked(&last);
+        if sent < total && last.elapsed() < Duration::from_millis(100) {
+            return;
+        }
+        *last = Instant::now();
+        let _ = app.emit("job-progress", JobProgress { job_id: &job_id, sent, total });
+    }
+}
+
 #[tauri::command]
 pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
     let InvokeBody::Raw(body) = request.body() else {
         return Err(Error::InvalidJob("Binärdaten erwartet".into()));
     };
-    let (meta, pages) = parse_job(body)?;
-    let protocol = protocol::get(&model(&app, &meta.model_id)?.protocol)?;
+    let (mut meta, pages) = parse_job(body)?;
+    let model = model(&app, &meta.model_id)?;
+    // Compression is only worth the risk where bandwidth hurts; USB is fast enough raw.
+    if matches!(meta.connection, Connection::Serial { .. }) {
+        meta.settings.compression = model.compression;
+    }
+    let protocol = protocol::get(&model.protocol)?;
     let job = protocol.print(&meta.settings, &pages)?;
     let busy_for = print_duration(&meta.settings, &pages);
-    with_device(&app, move |state| {
-        meta.connection.send(&job)?;
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    let state = app.state::<DeviceState>();
+    locked(&state.jobs).insert(meta.job_id.clone(), cancel.clone());
+
+    let report = progress_reporter(app.clone(), meta.job_id.clone());
+    let connection = meta.connection.clone();
+    let result = with_device(&app, &connection, move |state| {
+        // Cancelled while waiting for the device: nothing was sent yet.
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        meta.connection.send(&job, &Progress::new(&report, &cancel))?;
         state.mark_busy(&meta.connection, busy_for);
         Ok(())
     })
-    .await
+    .await;
+
+    locked(&state.jobs).remove(&meta.job_id);
+    result
+}
+
+#[tauri::command]
+pub fn cancel_job(state: State<'_, DeviceState>, job_id: String) {
+    if let Some(flag) = locked(&state.jobs).get(&job_id) {
+        flag.store(true, Ordering::Relaxed);
+    }
 }
 
 const OPENABLE: [&str; 5] = ["pdf", "png", "jpg", "jpeg", "webp"];
@@ -351,6 +415,7 @@ mod tests {
 
     fn meta(pages: serde_json::Value) -> serde_json::Value {
         serde_json::json!({
+            "jobId": "job-1",
             "connection": { "type": "usb", "vendorId": 11836, "productId": 22361, "serial": "Q7" },
             "modelId": "phomemo-d530-pro",
             "settings": {

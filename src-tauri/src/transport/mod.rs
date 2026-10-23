@@ -4,6 +4,7 @@ pub mod cups;
 pub mod serial;
 pub mod usb;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -24,16 +25,55 @@ pub enum Connection {
 /// Per USB transfer; a printer that is busy printing a long label holds off new data.
 const SEND_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Feedback for long transfers: Bluetooth needs minutes for an uncompressed label.
+pub struct Progress<'a> {
+    report: &'a (dyn Fn(usize, usize) + Sync),
+    cancel: &'a AtomicBool,
+}
+
+static NEVER_CANCELLED: AtomicBool = AtomicBool::new(false);
+
+impl<'a> Progress<'a> {
+    pub fn new(report: &'a (dyn Fn(usize, usize) + Sync), cancel: &'a AtomicBool) -> Self {
+        Self { report, cancel }
+    }
+
+    /// For short commands where progress does not matter.
+    pub fn silent() -> Progress<'static> {
+        Progress {
+            report: &|_, _| {},
+            cancel: &NEVER_CANCELLED,
+        }
+    }
+
+    pub fn report(&self, sent: usize, total: usize) {
+        (self.report)(sent, total);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
+}
+
 /// The Phomemo/QIN firmware needs up to ~3 s to answer a batch of queries.
 const STATUS_TIMEOUT: Duration = Duration::from_secs(4);
 
 impl Connection {
-    pub fn send(&self, data: &[u8]) -> Result<()> {
+    pub fn send(&self, data: &[u8], progress: &Progress) -> Result<()> {
         match self {
-            Connection::Usb(sel) => usb::UsbPrinter::open(sel)?.send(data, SEND_TIMEOUT),
-            Connection::Serial { path } => serial::send(path, data, SEND_TIMEOUT),
-            Connection::Cups { queue } => cups::send(queue, data),
+            Connection::Usb(sel) => usb::UsbPrinter::open(sel)?.send(data, SEND_TIMEOUT, progress),
+            Connection::Serial { path } => serial::send(path, data, progress),
+            Connection::Cups { queue } => {
+                cups::send(queue, data)?;
+                progress.report(data.len(), data.len());
+                Ok(())
+            }
         }
+    }
+
+    /// Stable identity, used to serialise access per device.
+    pub fn key(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
     }
 
     /// Without a dialect only USB can tell whether the device is there; opening a

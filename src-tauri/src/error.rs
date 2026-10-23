@@ -17,6 +17,9 @@ pub enum Error {
     #[error("Zeitüberschreitung: {0}")]
     Timeout(String),
 
+    #[error("Druck abgebrochen")]
+    Cancelled,
+
     #[error("Ungültiger Druckauftrag: {0}")]
     InvalidJob(String),
 

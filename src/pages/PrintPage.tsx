@@ -18,7 +18,7 @@ import { LabelPreview } from "../components/LabelPreview";
 import { pickFiles } from "../components/AppLayout";
 import { useToast } from "../components/Toasts";
 import { Button, NumberInput, Section, Segmented, Toggle } from "../components/ui";
-import { errorMessage, printJob, type PrintPage as JobPage } from "../lib/api";
+import { cancelJob, errorMessage, onJobProgress, printJob, type PrintPage as JobPage } from "../lib/api";
 import { useConfig } from "../lib/config";
 import { useDocuments, type LabelDocument } from "../lib/documents";
 import { renderLabel } from "../lib/render";
@@ -170,6 +170,33 @@ function LayoutPanel({ layout, setLayout }: { layout: LayoutOptions; setLayout: 
   );
 }
 
+function JobProgressBar({
+  job,
+  onCancel,
+}: {
+  job: { sent: number; total: number };
+  onCancel: () => void;
+}) {
+  const percent = job.total > 0 ? Math.round((job.sent / job.total) * 100) : 0;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="h-1.5 overflow-hidden rounded-full bg-sunken">
+        <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="tabular flex items-center justify-between text-[11px] text-muted">
+        <span>
+          {job.total === 0
+            ? "Bereite vor …"
+            : `Sende ${percent} % · ${Math.round(job.sent / 1024)} / ${Math.round(job.total / 1024)} KB`}
+        </span>
+        <button className="font-medium text-err hover:underline" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState() {
   const { addPaths } = useDocuments();
   return (
@@ -200,6 +227,14 @@ export function PrintPage() {
   const status = useStatus();
   const toast = useToast();
   const [printing, setPrinting] = useState<"all" | "current" | null>(null);
+  const [job, setJob] = useState<{ id: string; sent: number; total: number } | null>(null);
+
+  useEffect(() => {
+    const unlisten = onJobProgress((p) =>
+      setJob((current) => (current?.id === p.jobId ? { ...current, sent: p.sent, total: p.total } : current)),
+    );
+    return () => void unlisten.then((stop) => stop());
+  }, []);
 
   const { docs, active, activePage } = documents;
   const selected = docs.filter((d) => d.selected);
@@ -217,12 +252,15 @@ export function PrintPage() {
             pages.push({ bitmap, copies: doc.copies });
           }
         }
-        await printJob(printer, pages);
+        const jobId = crypto.randomUUID();
+        setJob({ id: jobId, sent: 0, total: 0 });
+        await printJob(printer, pages, jobId);
         documents.markPrinted(targets.map((d) => d.id));
         toast.success(`${plural(labelCount(targets))} an ${printer.name} gesendet`);
       } catch (err) {
         toast.error(`Druck fehlgeschlagen: ${errorMessage(err)}`);
       } finally {
+        setJob(null);
         setPrinting(null);
         status.setPrinting(printer.id, false);
         if (printer.connection.type === "usb") void status.refresh(printer);
@@ -325,9 +363,13 @@ export function PrintPage() {
               Nur angezeigtes drucken
             </Button>
           )}
-          <p className="text-center text-[11px] text-faint">
-            {activePrinter ? `auf ${activePrinter.name} · ⌘P` : "Kein Drucker"}
-          </p>
+          {job ? (
+            <JobProgressBar job={job} onCancel={() => void cancelJob(job.id)} />
+          ) : (
+            <p className="text-center text-[11px] text-faint">
+              {activePrinter ? `auf ${activePrinter.name} · ⌘P` : "Kein Drucker"}
+            </p>
+          )}
         </div>
       </aside>
     </div>

@@ -26,6 +26,8 @@ nusb = "0.2"
 tauri-plugin-dialog = "2"
 thiserror = "2"
 serialport = { version = "4", default-features = false }
+libc = "0.2"
+lzokay = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

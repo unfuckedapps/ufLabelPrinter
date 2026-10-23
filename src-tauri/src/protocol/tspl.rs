@@ -6,7 +6,7 @@
 
 use std::fmt::Write as _;
 
-use super::{JobSettings, Media, Page, Protocol};
+use super::{Compression, JobSettings, Media, Page, Protocol};
 use crate::error::{Error, Result};
 
 pub struct Tspl;
@@ -58,10 +58,29 @@ fn build_job(settings: &JobSettings, pages: &[Page]) -> Result<Vec<u8>> {
     for page in pages {
         page.validate()?;
         out.extend_from_slice(b"CLS\r\n");
-        out.extend_from_slice(
-            format!("BITMAP 0,0,{},{},0,", page.width_bytes, page.height).as_bytes(),
-        );
-        out.extend(page.data.iter().map(|b| !b));
+        let inverted: Vec<u8> = page.data.iter().map(|b| !b).collect();
+        match settings.compression {
+            Compression::None => {
+                out.extend_from_slice(
+                    format!("BITMAP 0,0,{},{},0,", page.width_bytes, page.height).as_bytes(),
+                );
+                out.extend_from_slice(&inverted);
+            }
+            Compression::Lzo => {
+                let packed = lzokay::compress::compress(&inverted)
+                    .map_err(|e| Error::InvalidJob(format!("LZO-Komprimierung: {e:?}")))?;
+                out.extend_from_slice(
+                    format!(
+                        "BITMAP 0,0,{},{},3,{},",
+                        page.width_bytes,
+                        page.height,
+                        packed.len()
+                    )
+                    .as_bytes(),
+                );
+                out.extend_from_slice(&packed);
+            }
+        }
         out.extend_from_slice(b"\r\n");
         out.extend_from_slice(format!("PRINT 1,{}\r\n", page.copies.max(1)).as_bytes());
     }
@@ -104,6 +123,7 @@ mod tests {
             speed: Some(4),
             rotate180: false,
             tear: true,
+            compression: Compression::None,
         }
     }
 
@@ -170,6 +190,39 @@ mod tests {
         .unwrap();
         assert!(bline.contains("BLINE 2.5 mm,0 mm\r\n"));
         assert!(bline.ends_with("BLINEDETECT\r\n"));
+    }
+
+    #[test]
+    fn compresses_bitmaps_like_labelife() {
+        // A mostly white 4x6" label at 300 dpi with a few black bars.
+        let (width_bytes, height) = (150, 1800);
+        let mut data = vec![0u8; width_bytes * height];
+        for y in (200..600).chain(900..1300) {
+            for x in (20..130).step_by(3) {
+                data[y * width_bytes + x] = 0xff;
+            }
+        }
+        let mut s = settings(Media::Gap {
+            gap_mm: 3.0,
+            offset_mm: 0.0,
+        });
+        s.compression = Compression::Lzo;
+        let job = Tspl
+            .print(&s, &[Page { width_bytes, height, copies: 1, data: data.clone() }])
+            .unwrap();
+
+        let prefix = b"CLS\r\nBITMAP 0,0,150,1800,3,";
+        let at = job.windows(prefix.len()).position(|w| w == prefix).unwrap() + prefix.len();
+        let comma = at + job[at..].iter().position(|&b| b == b',').unwrap();
+        let len: usize = std::str::from_utf8(&job[at..comma]).unwrap().parse().unwrap();
+        let packed = &job[comma + 1..comma + 1 + len];
+        assert_eq!(&job[comma + 1 + len..comma + 3 + len], b"\r\n");
+        assert!(len < data.len() / 20, "{len} bytes is barely compressed");
+
+        let mut unpacked = vec![0u8; data.len()];
+        let n = lzokay::decompress::decompress(packed, &mut unpacked).unwrap();
+        assert_eq!(n, data.len());
+        assert!(unpacked.iter().zip(&data).all(|(u, d)| *u == !d), "data must stay TSPL-inverted");
     }
 
     #[test]

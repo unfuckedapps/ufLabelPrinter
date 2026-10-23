@@ -32,6 +32,7 @@ pub fn run() {
             commands::feed_label,
             commands::calibrate,
             commands::print_job,
+            commands::cancel_job,
             commands::read_document,
             commands::take_pending_files,
             commands::load_config,

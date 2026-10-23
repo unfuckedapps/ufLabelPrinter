@@ -73,6 +73,10 @@ pub struct PrinterModel {
     pub density: Option<Range>,
     #[serde(default)]
     pub notes: Option<String>,
+    /// Bitmap compression the printer understands; used over Bluetooth, where the
+    /// uncompressed bitmap takes minutes.
+    #[serde(default)]
+    pub compression: crate::protocol::Compression,
     /// Set for files loaded from the user's model folder.
     #[serde(default, skip_deserializing)]
     pub custom: bool,

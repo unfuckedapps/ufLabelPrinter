@@ -12,6 +12,7 @@ use nusb::transfer::{Buffer, Bulk, Direction, In, Out, TransferError};
 use nusb::{DeviceInfo, Interface, MaybeFuture};
 use serde::{Deserialize, Serialize};
 
+use super::Progress;
 use crate::error::{Error, Result};
 
 const PRINTER_CLASS: u8 = 7;
@@ -111,15 +112,22 @@ impl UsbPrinter {
 
     /// Sends a complete job. Blocks until the printer accepted all bytes; a busy printer
     /// throttles us via NAKs, hence the generous timeout per transfer.
-    pub fn send(&self, data: &[u8], timeout: Duration) -> Result<()> {
+    pub fn send(&self, data: &[u8], timeout: Duration, progress: &Progress) -> Result<()> {
+        const CHUNK: usize = 16 * 1024;
         let mut writer = self
             .interface
             .endpoint::<Bulk, Out>(self.out_ep)?
-            .writer(16 * 1024)
+            .writer(CHUNK)
             .with_num_transfers(4)
             .with_write_timeout(timeout);
 
-        writer.write_all(data).map_err(map_io)?;
+        for (i, chunk) in data.chunks(CHUNK).enumerate() {
+            if progress.is_cancelled() {
+                return Err(Error::Cancelled);
+            }
+            writer.write_all(chunk).map_err(map_io)?;
+            progress.report((i * CHUNK + chunk.len()).min(data.len()), data.len());
+        }
         writer.flush().map_err(map_io)?;
         Ok(())
     }
@@ -155,7 +163,7 @@ impl UsbPrinter {
 
         while !read(Duration::from_millis(30))?.is_empty() {}
 
-        self.send(cmd, Duration::from_secs(2))?;
+        self.send(cmd, Duration::from_secs(2), &Progress::silent())?;
 
         let deadline = Instant::now() + timeout;
         let mut reply = Vec::new();
