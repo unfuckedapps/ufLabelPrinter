@@ -80,6 +80,21 @@ impl Connection {
         serde_json::to_string(self).unwrap_or_default()
     }
 
+    /// Sends `cmd` and collects the reply; `None` for transports that cannot read (CUPS).
+    pub fn exchange(
+        &self,
+        cmd: &[u8],
+        timeout: Duration,
+        done: impl Fn(&[u8]) -> bool,
+    ) -> Result<Option<Vec<u8>>> {
+        Ok(Some(match self {
+            Connection::Usb(sel) => usb::UsbPrinter::open(sel)?.exchange(cmd, timeout, done)?,
+            Connection::Serial { path } => serial::exchange(path, cmd, timeout, done)?,
+            Connection::Ble { id, name } => ble::exchange(id, name, cmd, timeout, done)?,
+            Connection::Cups { .. } => return Ok(None),
+        }))
+    }
+
     /// Without a dialect only USB can tell whether the device is there; opening a
     /// Bluetooth port would connect it, and CUPS queues are fire-and-forget.
     pub fn status(&self, dialect: Option<&dyn StatusDialect>) -> Result<PrinterStatus> {

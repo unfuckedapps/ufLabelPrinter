@@ -59,14 +59,18 @@ pub struct JobSettings {
 
 /// How bitmap data is encoded on the wire.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum Compression {
     #[default]
     None,
-    /// LZO1X, as Phomemo's Labelife sends it (TSPL `BITMAP` mode 3 with a length field).
+    /// LZO1X as Phomemo's Labelife sends it: TSPL `BITMAP` mode 3 with a length field.
     /// Shrinks a typical shipping label from ~270 KB to a few KB, which matters over
-    /// Bluetooth.
+    /// Bluetooth. In model files this means "pick mode 3 or 4 by asking the printer".
     Lzo,
+    /// `BITMAP` mode 4 (Labelife's `minilzoPackageData`): 4 KB blocks, each as
+    /// `u32 LE length` + LZO1X data, terminated by a zero length. Used by printers that
+    /// answer `SSSGETBMAPMODE` with 4.
+    LzoBlocks,
 }
 
 /// A 1-bit raster where a set bit means black. Rows are padded to whole bytes.

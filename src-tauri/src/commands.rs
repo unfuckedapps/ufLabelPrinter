@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{Error, Result};
 use crate::models::{ModelRegistry, PrinterModel};
-use crate::protocol::{self, JobSettings, Page};
+use crate::protocol::{self, Compression, JobSettings, Page};
 use crate::status::{self, PrinterStatus};
 use crate::transport::{Connection, Progress, ble, cups, serial, usb};
 
@@ -27,6 +27,8 @@ pub struct DeviceState {
     busy_until: Mutex<HashMap<String, Instant>>,
     /// Cancel flags of jobs that are being sent, by job id.
     jobs: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Bitmap encoding each printer asked for (`SSSGETBMAPMODE`), asked once per run.
+    bitmap_modes: Mutex<HashMap<String, Compression>>,
 }
 
 impl DeviceState {
@@ -42,6 +44,32 @@ impl DeviceState {
 
     fn mark_busy(&self, connection: &Connection, duration: Duration) {
         locked(&self.busy_until).insert(connection.key(), Instant::now() + duration);
+    }
+
+    /// Asks the printer which LZO bitmap mode it takes, like Labelife does after
+    /// connecting: a reply mentioning `SSSGETBMAPMODE` and `4` means mode 4, anything
+    /// else mode 3. Must run with the device lock held.
+    fn bitmap_mode(&self, connection: &Connection) -> Compression {
+        if let Some(mode) = locked(&self.bitmap_modes).get(&connection.key()) {
+            return *mode;
+        }
+        let query = b"SSSGETBMAPMODE\r\n";
+        let reply = connection
+            .exchange(query, Duration::from_secs(3), |r| {
+                String::from_utf8_lossy(r).contains("SSSGETBMAPMODE") && r.ends_with(b"\n")
+            })
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let text = String::from_utf8_lossy(&reply);
+        let mode = if text.contains("SSSGETBMAPMODE") && text.contains('4') {
+            Compression::LzoBlocks
+        } else {
+            Compression::Lzo
+        };
+        log::info!("{connection:?}: bitmap mode reply {:?} -> {mode:?}", text.trim());
+        locked(&self.bitmap_modes).insert(connection.key(), mode);
+        mode
     }
 }
 
@@ -342,13 +370,11 @@ pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
     };
     let (mut meta, pages) = parse_job(body)?;
     let model = model(&app, &meta.model_id)?;
-    // Compression is only worth the risk where bandwidth hurts; USB is fast enough raw.
-    if matches!(meta.connection, Connection::Serial { .. } | Connection::Ble { .. }) {
-        meta.settings.compression = model.compression;
-    }
     let protocol = protocol::get(&model.protocol)?;
-    let job = protocol.print(&meta.settings, &pages)?;
     let busy_for = print_duration(&meta.settings, &pages);
+    // Compression is only worth the risk where bandwidth hurts; USB is fast enough raw.
+    let compress = model.compression != Compression::None
+        && matches!(meta.connection, Connection::Serial { .. } | Connection::Ble { .. });
 
     let cancel = Arc::new(AtomicBool::new(false));
     let state = app.state::<DeviceState>();
@@ -356,28 +382,37 @@ pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
 
     let report = progress_reporter(app.clone(), meta.job_id.clone());
     let connection = meta.connection.clone();
-    log::info!(
-        "job {}: {} page(s), {} bytes to {connection:?} ({:?})",
-        meta.job_id,
-        pages.len(),
-        job.len(),
-        meta.settings.compression
-    );
+    let job_id = meta.job_id.clone();
     let result = with_device(&app, &connection, move |state| {
         // Cancelled while waiting for the device: nothing was sent yet.
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
+        if compress {
+            meta.settings.compression = match model.compression {
+                Compression::Lzo => state.bitmap_mode(&meta.connection),
+                fixed => fixed,
+            };
+        }
+        let job = protocol.print(&meta.settings, &pages)?;
+        log::info!(
+            "job {}: {} page(s), {} bytes to {:?} ({:?})",
+            meta.job_id,
+            pages.len(),
+            job.len(),
+            meta.connection,
+            meta.settings.compression
+        );
         meta.connection.send(&job, &Progress::new(&report, &cancel))?;
         state.mark_busy(&meta.connection, busy_for);
         Ok(())
     })
     .await;
 
-    locked(&state.jobs).remove(&meta.job_id);
+    locked(&state.jobs).remove(&job_id);
     match &result {
-        Ok(()) => log::info!("job {} sent", meta.job_id),
-        Err(err) => log::warn!("job {} failed: {err}", meta.job_id),
+        Ok(()) => log::info!("job {job_id} sent"),
+        Err(err) => log::warn!("job {job_id} failed: {err}"),
     }
     result
 }

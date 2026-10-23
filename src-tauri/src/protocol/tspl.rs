@@ -11,6 +11,9 @@ use crate::error::{Error, Result};
 
 pub struct Tspl;
 
+/// Block size of `BITMAP` mode 4, as in Labelife.
+const LZO_BLOCK: usize = 0x1000;
+
 /// Formats millimetres without a trailing ".0" (`101.6`, `3`).
 fn mm(value: f32) -> String {
     let rounded = (value * 10.0).round() / 10.0;
@@ -79,6 +82,18 @@ fn build_job(settings: &JobSettings, pages: &[Page]) -> Result<Vec<u8>> {
                     .as_bytes(),
                 );
                 out.extend_from_slice(&packed);
+            }
+            Compression::LzoBlocks => {
+                out.extend_from_slice(
+                    format!("BITMAP 0,0,{},{},4,", page.width_bytes, page.height).as_bytes(),
+                );
+                for block in inverted.chunks(LZO_BLOCK) {
+                    let packed = lzokay::compress::compress(block)
+                        .map_err(|e| Error::InvalidJob(format!("LZO compression failed: {e:?}")))?;
+                    out.extend_from_slice(&(packed.len() as u32).to_le_bytes());
+                    out.extend_from_slice(&packed);
+                }
+                out.extend_from_slice(&0u32.to_le_bytes());
             }
         }
         out.extend_from_slice(b"\r\n");
@@ -223,6 +238,38 @@ mod tests {
         let n = lzokay::decompress::decompress(packed, &mut unpacked).unwrap();
         assert_eq!(n, data.len());
         assert!(unpacked.iter().zip(&data).all(|(u, d)| *u == !d), "data must stay TSPL-inverted");
+    }
+
+    #[test]
+    fn packs_mode_4_in_4k_blocks() {
+        let (width_bytes, height) = (150, 100); // 15000 bytes: 3 full blocks + 1 partial
+        let data: Vec<u8> = (0..width_bytes * height).map(|i| (i % 7 == 0) as u8 * 0xff).collect();
+        let mut s = settings(Media::Gap {
+            gap_mm: 3.0,
+            offset_mm: 0.0,
+        });
+        s.compression = Compression::LzoBlocks;
+        let job = Tspl
+            .print(&s, &[Page { width_bytes, height, copies: 1, data: data.clone() }])
+            .unwrap();
+
+        let prefix = b"CLS\r\nBITMAP 0,0,150,100,4,";
+        let mut at = job.windows(prefix.len()).position(|w| w == prefix).unwrap() + prefix.len();
+        let mut unpacked = Vec::new();
+        loop {
+            let len = u32::from_le_bytes(job[at..at + 4].try_into().unwrap()) as usize;
+            at += 4;
+            if len == 0 {
+                break;
+            }
+            let mut block = vec![0u8; LZO_BLOCK];
+            let n = lzokay::decompress::decompress(&job[at..at + len], &mut block).unwrap();
+            unpacked.extend_from_slice(&block[..n]);
+            at += len;
+        }
+        assert_eq!(&job[at..at + 2], b"\r\n");
+        assert_eq!(unpacked.len(), data.len());
+        assert!(unpacked.iter().zip(&data).all(|(u, d)| *u == !d));
     }
 
     #[test]
