@@ -1,6 +1,6 @@
 [package]
 name = "uflabelprinter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Print to cheap thermal label printers without the vendor bloatware"
 authors = ["unfuckedapps"]
 license = "MIT"
