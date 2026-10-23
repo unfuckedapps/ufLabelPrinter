@@ -28,6 +28,7 @@ pub fn run() {
             commands::list_models,
             commands::open_models_dir,
             commands::list_devices,
+            commands::scan_ble,
             commands::printer_status,
             commands::feed_label,
             commands::calibrate,

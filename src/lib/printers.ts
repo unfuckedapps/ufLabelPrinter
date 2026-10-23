@@ -195,6 +195,8 @@ export function describeConnection(c: Connection): string {
       return `USB ${hex(c.vendorId)}:${hex(c.productId)}${c.serial ? ` · ${c.serial}` : ""}`;
     case "serial":
       return `${translator()("connection.serial")} · ${c.path.replace("/dev/cu.", "")}`;
+    case "ble":
+      return `${translator()("connection.ble")} · ${c.name}`;
     case "cups":
       return `CUPS · ${c.queue}`;
   }
@@ -209,6 +211,7 @@ export function sameConnection(a: Connection, b: Connection): boolean {
     return a.vendorId === b.vendorId && a.productId === b.productId && a.serial === b.serial;
   }
   if (a.type === "serial" && b.type === "serial") return a.path === b.path;
+  if (a.type === "ble" && b.type === "ble") return a.id === b.id;
   if (a.type === "cups" && b.type === "cups") return a.queue === b.queue;
   return false;
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   Bluetooth,
+  BluetoothSearching,
   Cable,
   CircleCheck,
   Crosshair,
@@ -19,7 +20,7 @@ import {
 import { useToast } from "../components/Toasts";
 import { translator, useT } from "../i18n";
 import { Button, Field, NumberInput, Section, Segmented, Select, StatusDot, TextInput, Toggle } from "../components/ui";
-import { calibrate, errorMessage, feedLabel, listDevices, openModelsDir, printJob } from "../lib/api";
+import { calibrate, errorMessage, feedLabel, listDevices, openModelsDir, printJob, scanBle } from "../lib/api";
 import { useConfig } from "../lib/config";
 import {
   describeConnection,
@@ -31,11 +32,19 @@ import {
 } from "../lib/printers";
 import { renderTestLabel } from "../lib/render";
 import { summarize, useStatus } from "../lib/status";
-import type { Connection, Devices, ModelRegistry, Printer, PrinterModel, PrinterProfile } from "../lib/types";
+import type {
+  BleDevice,
+  Connection,
+  Devices,
+  ModelRegistry,
+  Printer,
+  PrinterModel,
+  PrinterProfile,
+} from "../lib/types";
 
 function ConnectionIcon({ connection, className = "size-4" }: { connection: Connection; className?: string }) {
   if (connection.type === "usb") return <Cable className={className} />;
-  if (connection.type === "serial") return <Bluetooth className={className} />;
+  if (connection.type === "serial" || connection.type === "ble") return <Bluetooth className={className} />;
   return <Server className={className} />;
 }
 
@@ -49,7 +58,7 @@ interface Candidate {
   recognised: boolean;
 }
 
-function candidates(devices: Devices, registry: ModelRegistry): Candidate[] {
+function candidates(devices: Devices, ble: BleDevice[], registry: ModelRegistry): Candidate[] {
   const find = (id: string | null) => registry.models.find((m) => m.id === id) ?? null;
   const resolve = (id: string | null, dpi: number) => ({
     model: find(id) ?? find(genericModelId(dpi)),
@@ -74,6 +83,13 @@ function candidates(devices: Devices, registry: ModelRegistry): Candidate[] {
       connection: { type: "serial", path: s.path } as Connection,
       ...resolve(s.modelId, 203),
     })),
+    ...ble.map((d) => ({
+      key: `ble-${d.id}`,
+      name: d.name,
+      detail: `${translator()("connection.ble")}${d.rssi === null ? "" : ` · ${d.rssi} dBm`}`,
+      connection: { type: "ble", id: d.id, name: d.name } as Connection,
+      ...resolve(d.modelId, 203),
+    })),
     ...devices.cups.map((q) => ({
       key: `cups-${q.name}`,
       name: q.name.replace(/_/g, " "),
@@ -90,6 +106,8 @@ function DeviceFinder() {
   const t = useT();
   const [devices, setDevices] = useState<Devices | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ble, setBle] = useState<BleDevice[]>([]);
+  const [scanningBle, setScanningBle] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
   const scan = useCallback(async () => {
@@ -105,8 +123,20 @@ function DeviceFinder() {
 
   useEffect(() => void scan(), [scan]);
 
+  // Not automatic: a BLE scan takes seconds and may ask for Bluetooth permission.
+  const searchBle = async () => {
+    setScanningBle(true);
+    try {
+      setBle(await scanBle());
+    } catch (err) {
+      toast.error(t("printers.add.bleFailed", { error: errorMessage(err) }));
+    } finally {
+      setScanningBle(false);
+    }
+  };
+
   const found = devices
-    ? candidates(devices, models).filter(
+    ? candidates(devices, ble, models).filter(
         (c) =>
           // USB printer-class devices are printers by definition; serial ports and CUPS
           // queues can be anything, so only recognised ones are offered by default.
@@ -157,6 +187,17 @@ function DeviceFinder() {
           </li>
         )}
       </ul>
+      <div className="flex flex-col gap-1.5">
+        <Button
+          size="sm"
+          busy={scanningBle}
+          icon={<BluetoothSearching className="size-3.5" />}
+          onClick={() => void searchBle()}
+        >
+          {scanningBle ? t("printers.add.scanning") : t("printers.add.scanBle")}
+        </Button>
+        <p className="px-1 text-[11px] leading-snug text-faint">{t("printers.add.bleHint")}</p>
+      </div>
       <Toggle
         checked={showAll}
         onChange={setShowAll}

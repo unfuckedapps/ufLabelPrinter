@@ -28,6 +28,7 @@ export const fr: Dictionary = {
   connection: {
     usb: "USB",
     serial: "Bluetooth",
+    ble: "Bluetooth LE",
     cups: "CUPS",
   },
   drop: {
@@ -104,6 +105,10 @@ export const fr: Dictionary = {
     add: {
       title: "Ajouter des appareils",
       search: "Rechercher",
+      scanBle: "Rechercher en Bluetooth LE",
+      scanning: "Recherche …",
+      bleHint: "Le Bluetooth LE ne nécessite pas d’appairage dans les Réglages Système. Allumez l’imprimante et gardez-la à proximité.",
+      bleFailed: "Échec de la recherche Bluetooth LE : {error}",
       add: "Ajouter",
       added: "{name} ajoutée",
       recognised: "{model} reconnue",
@@ -245,6 +250,8 @@ export const fr: Dictionary = {
     sendTimeout: "L’imprimante n’a pas accepté les données",
     portUnavailable: "{path} n’est pas disponible – l’imprimante est-elle allumée et appairée ?",
     connectFailed: "Connexion Bluetooth impossible à {path}. Éteignez puis rallumez l’imprimante et vérifiez qu’aucun téléphone n’y est connecté.",
+    ble: "Erreur Bluetooth LE",
+    blePermission: "Thermalprinter n’a pas le droit d’utiliser le Bluetooth. Autorisez-le dans Réglages Système → Confidentialité et sécurité → Bluetooth.",
     stalled: "Transfert Bluetooth bloqué à {sentKb} sur {totalKb} Ko – imprimante hors de portée ou déconnectée ?",
     disconnected: "Connexion Bluetooth interrompue après {sentKb} sur {totalKb} Ko",
     cancelled: "Impression annulée",

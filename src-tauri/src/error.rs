@@ -25,6 +25,12 @@ pub enum Error {
     #[error("could not establish a Bluetooth connection via {path}")]
     ConnectFailed { path: String },
 
+    #[error("Bluetooth LE: {0}")]
+    Ble(String),
+
+    #[error("no permission to use Bluetooth")]
+    BlePermission,
+
     #[error("Bluetooth transfer stalled at {sent} of {total} bytes")]
     Stalled { sent: usize, total: usize },
 
@@ -59,6 +65,8 @@ impl Error {
             Error::SendTimeout => "sendTimeout",
             Error::PortUnavailable { .. } => "portUnavailable",
             Error::ConnectFailed { .. } => "connectFailed",
+            Error::Ble(_) => "ble",
+            Error::BlePermission => "blePermission",
             Error::Stalled { .. } => "stalled",
             Error::Disconnected { .. } => "disconnected",
             Error::Cancelled => "cancelled",

@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 use crate::models::{ModelRegistry, PrinterModel};
 use crate::protocol::{self, JobSettings, Page};
 use crate::status::{self, PrinterStatus};
-use crate::transport::{Connection, Progress, cups, serial, usb};
+use crate::transport::{Connection, Progress, ble, cups, serial, usb};
 
 fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -153,6 +153,32 @@ pub async fn list_devices(app: AppHandle) -> Result<Devices> {
             serial,
             cups: queues,
         })
+    })
+    .await
+    .map_err(|err| Error::Other(err.to_string()))?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BleDevice {
+    #[serde(flatten)]
+    pub info: ble::BleDeviceInfo,
+    pub model_id: Option<String>,
+}
+
+/// Scans a few seconds for Bluetooth LE devices. Separate from `list_devices` because it
+/// takes a while and may trigger the macOS Bluetooth permission prompt.
+#[tauri::command]
+pub async fn scan_ble(app: AppHandle) -> Result<Vec<BleDevice>> {
+    let registry = list_models(app);
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(ble::scan()?
+            .into_iter()
+            .map(|info| BleDevice {
+                model_id: registry.match_bluetooth(&info.name).map(|m| m.id.clone()),
+                info,
+            })
+            .collect())
     })
     .await
     .map_err(|err| Error::Other(err.to_string()))?
@@ -305,7 +331,7 @@ pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
     let (mut meta, pages) = parse_job(body)?;
     let model = model(&app, &meta.model_id)?;
     // Compression is only worth the risk where bandwidth hurts; USB is fast enough raw.
-    if matches!(meta.connection, Connection::Serial { .. }) {
+    if matches!(meta.connection, Connection::Serial { .. } | Connection::Ble { .. }) {
         meta.settings.compression = model.compression;
     }
     let protocol = protocol::get(&model.protocol)?;

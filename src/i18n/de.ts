@@ -28,6 +28,7 @@ export const de: Dictionary = {
   connection: {
     usb: "USB",
     serial: "Bluetooth",
+    ble: "Bluetooth LE",
     cups: "CUPS",
   },
   drop: {
@@ -101,6 +102,10 @@ export const de: Dictionary = {
     add: {
       title: "Geräte hinzufügen",
       search: "Suchen",
+      scanBle: "Bluetooth LE suchen",
+      scanning: "Suche …",
+      bleHint: "Bluetooth LE braucht keine Kopplung in den Systemeinstellungen. Drucker einschalten und in der Nähe lassen.",
+      bleFailed: "Bluetooth-LE-Suche fehlgeschlagen: {error}",
       add: "Hinzufügen",
       added: "{name} hinzugefügt",
       recognised: "{model} erkannt",
@@ -242,6 +247,8 @@ export const de: Dictionary = {
     sendTimeout: "Der Drucker hat die Daten nicht angenommen",
     portUnavailable: "{path} ist nicht verfügbar – ist der Drucker eingeschaltet und gekoppelt?",
     connectFailed: "Keine Bluetooth-Verbindung zu {path}. Drucker aus- und einschalten und sicherstellen, dass kein Handy mit ihm verbunden ist.",
+    ble: "Bluetooth-LE-Fehler",
+    blePermission: "Thermalprinter darf Bluetooth nicht verwenden. In Systemeinstellungen → Datenschutz & Sicherheit → Bluetooth erlauben.",
     stalled: "Bluetooth-Übertragung hängt bei {sentKb} von {totalKb} KB – Drucker außer Reichweite oder getrennt?",
     disconnected: "Bluetooth-Verbindung nach {sentKb} von {totalKb} KB abgerissen",
     cancelled: "Druck abgebrochen",

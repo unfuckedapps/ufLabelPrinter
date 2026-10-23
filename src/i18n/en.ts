@@ -31,6 +31,7 @@ export const en = {
   connection: {
     usb: "USB",
     serial: "Bluetooth",
+    ble: "Bluetooth LE",
     cups: "CUPS",
   },
   drop: {
@@ -104,6 +105,10 @@ export const en = {
     add: {
       title: "Add devices",
       search: "Search",
+      scanBle: "Scan Bluetooth LE",
+      scanning: "Scanning …",
+      bleHint: "Bluetooth LE needs no pairing in System Settings. Switch the printer on and keep it close.",
+      bleFailed: "Bluetooth LE scan failed: {error}",
       add: "Add",
       added: "{name} added",
       recognised: "{model} recognised",
@@ -245,6 +250,8 @@ export const en = {
     sendTimeout: "The printer did not accept the data",
     portUnavailable: "{path} is not available – is the printer switched on and paired?",
     connectFailed: "Could not connect to {path} via Bluetooth. Switch the printer off and on and make sure no phone is connected to it.",
+    ble: "Bluetooth LE error",
+    blePermission: "Thermalprinter may not use Bluetooth. Allow it in System Settings → Privacy & Security → Bluetooth.",
     stalled: "Bluetooth transfer stalled at {sentKb} of {totalKb} KB – printer out of range or disconnected?",
     disconnected: "Bluetooth connection dropped after {sentKb} of {totalKb} KB",
     cancelled: "Printing cancelled",

@@ -1,5 +1,6 @@
 //! Transports move opaque bytes to a printer; they know nothing about printer languages.
 
+pub mod ble;
 pub mod cups;
 pub mod serial;
 pub mod usb;
@@ -19,6 +20,8 @@ pub enum Connection {
     Usb(usb::UsbSelector),
     /// Bluetooth SPP (or any other serial) port, e.g. `/dev/cu.D530Pro`.
     Serial { path: String },
+    /// Bluetooth Low Energy; `name` helps to find the printer again if the id changed.
+    Ble { id: String, name: String },
     Cups { queue: String },
 }
 
@@ -63,6 +66,7 @@ impl Connection {
         match self {
             Connection::Usb(sel) => usb::UsbPrinter::open(sel)?.send(data, SEND_TIMEOUT, progress),
             Connection::Serial { path } => serial::send(path, data, progress),
+            Connection::Ble { id, name } => ble::send(id, name, data, progress),
             Connection::Cups { queue } => {
                 cups::send(queue, data)?;
                 progress.report(data.len(), data.len());
@@ -90,7 +94,10 @@ impl Connection {
             (Connection::Serial { path }, Some(d)) => {
                 serial::exchange(path, &d.request(), STATUS_TIMEOUT, |r| d.is_complete(r))?
             }
-            (Connection::Serial { .. } | Connection::Cups { .. }, _) => {
+            (Connection::Ble { id, name }, Some(d)) => {
+                ble::exchange(id, name, &d.request(), STATUS_TIMEOUT, |r| d.is_complete(r))?
+            }
+            (Connection::Serial { .. } | Connection::Ble { .. } | Connection::Cups { .. }, _) => {
                 return Ok(PrinterStatus::default());
             }
         };

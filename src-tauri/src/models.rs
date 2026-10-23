@@ -26,7 +26,8 @@ pub struct UsbId {
 pub struct ModelMatch {
     #[serde(default)]
     pub usb: Vec<UsbId>,
-    /// Prefixes of the Bluetooth device name (macOS port `/dev/cu.<name>`).
+    /// Prefixes of the Bluetooth name, Classic (`/dev/cu.<name>`) or LE. Compared without
+    /// case, spaces, dashes and underscores, so "D530Pro" also matches "D530 Pro_1A2B".
     #[serde(default)]
     pub bluetooth: Vec<String>,
 }
@@ -177,10 +178,21 @@ impl ModelRegistry {
     }
 
     pub fn match_bluetooth(&self, name: &str) -> Option<&PrinterModel> {
-        self.models
-            .iter()
-            .find(|m| m.matches.bluetooth.iter().any(|prefix| name.starts_with(prefix.as_str())))
+        let name = normalize(name);
+        self.models.iter().find(|m| {
+            m.matches
+                .bluetooth
+                .iter()
+                .any(|prefix| !prefix.is_empty() && name.starts_with(&normalize(prefix)))
+        })
     }
+}
+
+fn normalize(name: &str) -> String {
+    name.chars()
+        .filter(|c| !matches!(c, ' ' | '-' | '_'))
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 #[cfg(test)]
@@ -200,6 +212,7 @@ mod tests {
         assert_eq!(registry.match_usb(11836, 22361).unwrap().id, "phomemo-d530-pro");
         assert_eq!(registry.match_bluetooth("D530Pro").unwrap().id, "phomemo-d530-pro");
         assert_eq!(registry.match_bluetooth("Y468BT-4958").unwrap().id, "vevor-y468bt");
+        assert_eq!(registry.match_bluetooth("D530 Pro_3A6A").unwrap().id, "phomemo-d530-pro");
         assert!(registry.match_bluetooth("iPhone").is_none());
     }
 

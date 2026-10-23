@@ -3,13 +3,25 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import { describeError, translator } from "../i18n";
 import { jobSettings } from "./printers";
-import type { AppConfig, Bitmap, Devices, ModelRegistry, Printer, PrinterProfile, PrinterStatus } from "./types";
+import type {
+  AppConfig,
+  Bitmap,
+  BleDevice,
+  Devices,
+  ModelRegistry,
+  Printer,
+  PrinterProfile,
+  PrinterStatus,
+} from "./types";
 
 export const listModels = () => invoke<ModelRegistry>("list_models");
 
 export const openModelsDir = () => invoke<void>("open_models_dir");
 
 export const listDevices = () => invoke<Devices>("list_devices");
+
+/** Takes a few seconds; may trigger the macOS Bluetooth permission prompt. */
+export const scanBle = () => invoke<BleDevice[]>("scan_ble");
 
 export const printerStatus = (p: PrinterProfile) =>
   invoke<PrinterStatus>("printer_status", { connection: p.connection, modelId: p.modelId });

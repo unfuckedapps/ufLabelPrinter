@@ -3,6 +3,7 @@ import type { Language } from "../i18n";
 export type Connection =
   | { type: "usb"; vendorId: number; productId: number; serial: string | null }
   | { type: "serial"; path: string }
+  | { type: "ble"; id: string; name: string }
   | { type: "cups"; queue: string };
 
 /** How the printer finds the start of the next label. */
@@ -93,6 +94,13 @@ export interface UsbDevice {
 export interface SerialDevice {
   path: string;
   name: string;
+  modelId: string | null;
+}
+
+export interface BleDevice {
+  id: string;
+  name: string;
+  rssi: number | null;
   modelId: string | null;
 }
 
