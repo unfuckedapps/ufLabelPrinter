@@ -293,8 +293,10 @@ fn crc_frame(data: &[u8], packet: usize) -> Vec<u8> {
     out
 }
 
-/// How long to wait for the printer's first credits after subscribing.
+/// How long to wait for the printer's first credits after subscribing. Only the
+/// Phomemo/QIN characteristic (FF02) is known to hand them out; others get a short look.
 const GREETING_WAIT: Duration = Duration::from_millis(1500);
+const GREETING_WAIT_OTHERS: Duration = Duration::from_millis(250);
 
 /// Frames under CRC stay small enough for the one-byte packet count.
 const CRC_BLOCK: usize = 4096;
@@ -384,7 +386,12 @@ async fn connect(id: &str, name: &str) -> Result<Link> {
             }
         }));
 
-        let deadline = Instant::now() + GREETING_WAIT;
+        let wait = if write.uuid == WRITE_CHARS[0] {
+            GREETING_WAIT
+        } else {
+            GREETING_WAIT_OTHERS
+        };
+        let deadline = Instant::now() + wait;
         while !flow.managed.load(Ordering::Relaxed) && Instant::now() < deadline {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }

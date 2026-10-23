@@ -35,6 +35,8 @@ itself and talks to the printer directly over **USB**, **Bluetooth** or, if you 
   that support it. Status is never queried while the printer is still printing.
 - **It integrates with the system.** You can drag & drop files, use ⌘O / ⌘P, use
   "Open With" from Finder, or drop files on the Dock icon.
+- **Bluetooth LE without pairing.** Vendor flow control (Phomemo/QIN credits) and
+  compressed bitmaps are handled, so a shipping label goes out in a few seconds.
 - **It is modular.** Printer models are JSON files, and printer languages and status
   dialects are small Rust modules. See [Adding a printer](docs/adding-a-printer.md).
 
@@ -42,8 +44,8 @@ itself and talks to the printer directly over **USB**, **Bluetooth** or, if you 
 
 | Printer                 | Connection      | Language | Status            | Notes                                                    |
 | ----------------------- | --------------- | -------- | ----------------- | -------------------------------------------------------- |
-| Phomemo D530 Pro        | USB, Bluetooth  | TSPL     | yes (`phomemo`)   | 300 dpi. Shows up as "QIN LabelPrinter" on USB.          |
-| Vevor Y468BT            | USB, Bluetooth  | TSPL     | –                 | 203 or 300 dpi variants, printing not verified yet       |
+| Phomemo D530 Pro        | USB, BLE        | TSPL     | yes (`phomemo`)   | 300 dpi. BLE uses credit flow control + LZO mode 4       |
+| Vevor Y468BT            | USB, BLE        | TSPL     | –                 | 203 or 300 dpi variants                                  |
 | Generic TSPL, 203 dpi   | USB, BT, CUPS   | TSPL     | –                 | Most 4" shipping label printers speak TSPL               |
 | Generic TSPL, 300 dpi   | USB, BT, CUPS   | TSPL     | –                 |                                                          |
 
@@ -64,9 +66,10 @@ pnpm tauri build    # build Thermalprinter.app and a .dmg
 ```
 
 On first start, every USB label printer that is connected is set up automatically.
-Bluetooth printers have to be paired in System Settings first. After that they show
-up under **Printers → Add devices**. macOS exposes paired Bluetooth Classic
-printers as serial ports (`/dev/cu.<name>`), which is all the app needs.
+Bluetooth printers are added under **Printers → Scan Bluetooth LE**; no pairing in
+System Settings is needed, macOS only asks once for Bluetooth permission. Paired
+Bluetooth Classic printers (`/dev/cu.<name>`) work too, but on macOS LE is far more
+reliable.
 
 The UI is available in English, German, French and Spanish (switch it in the toolbar).
 To add a language, copy `src/i18n/en.ts`, translate it and register it in
