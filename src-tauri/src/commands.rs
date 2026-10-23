@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 use crate::models::{ModelRegistry, PrinterModel};
 use crate::protocol::{self, Compression, JobSettings, Page};
 use crate::status::{self, PrinterStatus};
-use crate::transport::{Connection, Progress, ble, cups, serial, usb};
+use crate::transport::{Connection, Progress, SystemQueue, ble, serial, spool, usb};
 
 fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -120,18 +120,22 @@ pub fn open_log_dir(app: AppHandle) -> Result<()> {
         .path()
         .app_log_dir()
         .map_err(|err| Error::Other(err.to_string()))?;
-    std::fs::create_dir_all(&dir)?;
-    std::process::Command::new("open").arg(&dir).spawn()?;
-    Ok(())
+    open_dir(&app, &dir)
 }
 
-/// Opens the folder for custom model files in Finder, creating it on first use.
+fn open_dir(app: &AppHandle, dir: &std::path::Path) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    std::fs::create_dir_all(dir)?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|err| Error::Other(err.to_string()))
+}
+
+/// Opens the folder for custom model files, creating it on first use.
 #[tauri::command]
 pub fn open_models_dir(app: AppHandle) -> Result<()> {
     let dir = user_models_dir(&app).ok_or_else(|| Error::Other("no app config directory".into()))?;
-    std::fs::create_dir_all(&dir)?;
-    std::process::Command::new("open").arg(&dir).spawn()?;
-    Ok(())
+    open_dir(&app, &dir)
 }
 
 #[derive(Serialize)]
@@ -157,14 +161,14 @@ pub struct SerialDevice {
 pub struct Devices {
     pub usb: Vec<UsbDevice>,
     pub serial: Vec<SerialDevice>,
-    pub cups: Vec<cups::CupsQueue>,
+    pub cups: Vec<SystemQueue>,
 }
 
 #[tauri::command]
 pub async fn list_devices(app: AppHandle) -> Result<Devices> {
     let registry = list_models(app);
     tauri::async_runtime::spawn_blocking(move || {
-        let queues = cups::list().unwrap_or_default();
+        let queues = spool::list().unwrap_or_default();
         let usb = usb::list()?
             .into_iter()
             .map(|info| {

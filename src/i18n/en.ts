@@ -263,6 +263,13 @@ export const en = {
     io: "Input/output error",
     other: "Error",
   },
+  update: {
+    available: "Update {version}",
+    title: "Version {version} is available",
+    install: "Install and restart",
+    downloading: "Downloading {percent} %",
+    failed: "Update failed: {error}",
+  },
   toast: {
     close: "Close",
   },

@@ -5,16 +5,44 @@ pub mod protocol;
 pub mod status;
 pub mod transport;
 
+use std::path::PathBuf;
 use std::sync::RwLock;
 
-use tauri::{Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use commands::{DeviceState, Models, PendingFiles};
 use models::ModelRegistry;
 
+/// Hands files from "Open With" / file associations to the UI, which drains the queue on
+/// this signal and once on startup.
+fn open_files(app: &AppHandle, paths: impl IntoIterator<Item = PathBuf>) {
+    let paths: Vec<_> = paths.into_iter().filter(|p| p.is_file()).collect();
+    if paths.is_empty() {
+        return;
+    }
+    app.state::<PendingFiles>()
+        .0
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .extend(paths);
+    let _ = app.emit("files-opened", ());
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Windows and Linux start a new process per opened file; forward it to the running one.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        open_files(app, argv.into_iter().skip(1).map(PathBuf::from));
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    builder
         // Hardware problems are only debuggable with a log the user can send:
         // ~/Library/Logs/com.unfuckedapps.uflabelprinter/ufLabelPrinter.log on macOS.
         .plugin(
@@ -32,11 +60,16 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(DeviceState::default())
         .manage(PendingFiles::default())
         .setup(|app| {
             let registry = ModelRegistry::load(commands::user_models_dir(app.handle()).as_deref());
             app.manage(Models(RwLock::new(registry)));
+            // Files passed on the command line, e.g. by a file association on Windows/Linux.
+            #[cfg(not(target_os = "macos"))]
+            open_files(app.handle(), std::env::args().skip(1).map(PathBuf::from));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -57,18 +90,11 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
+        .run(|_app, _event| {
             // Finder "Open With" / dropping files on the Dock icon.
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
-            if let tauri::RunEvent::Opened { urls } = event {
-                let paths: Vec<_> = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();
-                app.state::<PendingFiles>()
-                    .0
-                    .lock()
-                    .unwrap_or_else(|p| p.into_inner())
-                    .extend(paths);
-                // The UI drains the queue on this signal and once on startup.
-                let _ = app.emit("files-opened", ());
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                open_files(_app, urls.iter().filter_map(|u| u.to_file_path().ok()));
             }
         });
 }

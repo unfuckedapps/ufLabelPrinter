@@ -1,9 +1,20 @@
 //! Transports move opaque bytes to a printer; they know nothing about printer languages.
 
 pub mod ble;
+#[cfg(unix)]
 pub mod cups;
 pub mod serial;
 pub mod usb;
+#[cfg(windows)]
+pub mod winspool;
+
+/// The operating system's print queues: CUPS on macOS and Linux, the spooler on Windows.
+pub mod spool {
+    #[cfg(unix)]
+    pub use super::cups::{list, send};
+    #[cfg(windows)]
+    pub use super::winspool::{list, send};
+}
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -12,6 +23,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::status::{PrinterStatus, StatusDialect};
+
+/// A print queue of the operating system.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemQueue {
+    pub name: String,
+    pub device_uri: String,
+    /// From the queue's PPD (CUPS only), e.g. 203 or 300.
+    pub dpi: Option<u32>,
+}
 
 /// How a printer profile reaches its device.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +43,8 @@ pub enum Connection {
     Serial { path: String },
     /// Bluetooth Low Energy; `name` helps to find the printer again if the id changed.
     Ble { id: String, name: String },
+    /// A system print queue (CUPS or the Windows spooler); the name is kept for
+    /// compatibility with saved configs.
     Cups { queue: String },
 }
 
@@ -68,7 +91,7 @@ impl Connection {
             Connection::Serial { path } => serial::send(path, data, progress),
             Connection::Ble { id, name } => ble::send(id, name, data, progress),
             Connection::Cups { queue } => {
-                cups::send(queue, data)?;
+                spool::send(queue, data)?;
                 progress.report(data.len(), data.len());
                 Ok(())
             }

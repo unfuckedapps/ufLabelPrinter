@@ -93,7 +93,21 @@ impl UsbPrinter {
             .ok_or_else(|| Error::Usb("device has no printer interface".into()))?;
 
         let device = info.open().wait()?;
-        let interface = device.claim_interface(iface_num).wait()?;
+        // Linux binds printers to the usblp kernel driver; take the interface over.
+        #[cfg(target_os = "linux")]
+        let claimed = device.detach_and_claim_interface(iface_num).wait();
+        #[cfg(not(target_os = "linux"))]
+        let claimed = device.claim_interface(iface_num).wait();
+        let interface = claimed.map_err(|err| {
+            if cfg!(windows) {
+                // usbprint.sys owns printer interfaces on Windows.
+                Error::Usb(format!(
+                    "{err} – on Windows print via a printer queue (Generic / Text Only driver on the USB port) or Bluetooth LE"
+                ))
+            } else {
+                Error::from(err)
+            }
+        })?;
 
         let desc = interface
             .descriptor()

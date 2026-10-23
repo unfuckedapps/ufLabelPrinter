@@ -4,20 +4,10 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use serde::Serialize;
-
+use super::SystemQueue;
 use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CupsQueue {
-    pub name: String,
-    pub device_uri: String,
-    /// From the queue's PPD, e.g. 203 or 300.
-    pub dpi: Option<u32>,
-}
-
-pub fn list() -> Result<Vec<CupsQueue>> {
+pub fn list() -> Result<Vec<SystemQueue>> {
     let output = Command::new("lpstat").arg("-v").output()?;
     let text = String::from_utf8_lossy(&output.stdout);
 
@@ -26,7 +16,7 @@ pub fn list() -> Result<Vec<CupsQueue>> {
         .filter_map(|line| {
             let rest = line.strip_prefix("device for ")?;
             let (name, uri) = rest.split_once(": ")?;
-            Some(CupsQueue {
+            Some(SystemQueue {
                 name: name.to_owned(),
                 device_uri: uri.trim().to_owned(),
                 dpi: ppd_resolution(name),

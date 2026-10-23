@@ -28,7 +28,6 @@ nusb = "0.2"
 tauri-plugin-dialog = "2"
 thiserror = "2"
 serialport = { version = "4", default-features = false }
-libc = "0.2"
 lzokay = "2"
 btleplug = "0.13"
 uuid = "1"
@@ -36,6 +35,8 @@ futures = "0.3"
 tokio = { version = "1", features = ["sync", "time"] }
 tauri-plugin-log = "2"
 log = "0.4"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -45,3 +46,12 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.61", features = ["Win32_Graphics_Printing", "Win32_Foundation"] }

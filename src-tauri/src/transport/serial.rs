@@ -1,5 +1,6 @@
-//! Bluetooth Classic (SPP) printers. Once paired, macOS exposes them as `/dev/cu.<name>`;
-//! opening the port establishes the RFCOMM link, so no vendor software is needed.
+//! Bluetooth Classic (SPP) printers. Once paired, macOS exposes them as `/dev/cu.<name>`,
+//! Windows as a COM port and Linux as `/dev/rfcomm*`; opening the port establishes the
+//! RFCOMM link, so no vendor software is needed.
 //!
 //! Bluetooth links are slow (a few KB/s) and can stall when the printer stops reading,
 //! so jobs are written in small non-blocking chunks: progress can be reported, the job
@@ -10,12 +11,16 @@
 
 use std::collections::BTreeSet;
 use std::io::{ErrorKind, Read, Write};
-use std::os::fd::AsRawFd;
 use std::sync::{Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use serialport::{SerialPort, TTYPort};
+use serialport::SerialPort;
+
+#[cfg(unix)]
+type Port = serialport::TTYPort;
+#[cfg(windows)]
+type Port = serialport::COMPort;
 
 use super::Progress;
 use crate::error::{Error, Result};
@@ -43,6 +48,21 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// up more stuck threads.
 static CONNECTING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
+#[cfg(not(target_os = "macos"))]
+pub fn list() -> Result<Vec<SerialPortInfo>> {
+    let ports = serialport::available_ports().map_err(|err| Error::Other(err.to_string()))?;
+    Ok(ports
+        .into_iter()
+        .map(|p| SerialPortInfo {
+            name: p.port_name.trim_start_matches("/dev/").to_owned(),
+            path: p.port_name,
+        })
+        .collect())
+}
+
+/// macOS lists every port twice (`tty.*` and `cu.*`); only `cu.*` can be opened without
+/// waiting for carrier detect.
+#[cfg(target_os = "macos")]
 pub fn list() -> Result<Vec<SerialPortInfo>> {
     let mut ports: Vec<_> = std::fs::read_dir("/dev")?
         .filter_map(|entry| {
@@ -58,7 +78,7 @@ pub fn list() -> Result<Vec<SerialPortInfo>> {
     Ok(ports)
 }
 
-fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
+fn open(path: &str, timeout: Duration) -> Result<Port> {
     let connect_failed = || Error::ConnectFailed { path: path.to_owned() };
     if !CONNECTING.lock().unwrap_or_else(|p| p.into_inner()).insert(path.to_owned()) {
         return Err(connect_failed());
@@ -68,7 +88,7 @@ fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
     let owned = path.to_owned();
     std::thread::spawn(move || {
         // The baud rate is meaningless for RFCOMM but required by the API.
-        let result = TTYPort::open(&serialport::new(&owned, 115_200).timeout(timeout));
+        let result = Port::open(&serialport::new(&owned, 115_200).timeout(timeout));
         CONNECTING.lock().unwrap_or_else(|p| p.into_inner()).remove(&owned);
         // Nobody listens any more after a timeout; the port is then simply closed again.
         let _ = tx.send(result);
@@ -89,13 +109,17 @@ fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
 
     // serialport leaves the descriptor blocking, so a full RFCOMM buffer would park us
     // inside write() with no way out. Non-blocking writes return early instead and the
-    // crate's own poll() applies the timeout.
-    let fd = port.as_raw_fd();
-    // SAFETY: plain fcntl on a descriptor owned by `port`, which outlives these calls.
-    unsafe {
-        let flags = libc::fcntl(fd, libc::F_GETFL);
-        if flags >= 0 {
-            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+    // crate's own poll() applies the timeout. (Windows COM ports honour the timeout.)
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        let fd = port.as_raw_fd();
+        // SAFETY: plain fcntl on a descriptor owned by `port`, which outlives these calls.
+        unsafe {
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            if flags >= 0 {
+                libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+            }
         }
     }
     Ok(port)

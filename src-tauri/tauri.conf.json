@@ -25,12 +25,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": "all",
     "category": "Productivity",
     "fileAssociations": [
       {
-        "ext": ["pdf"],
-        "name": "PDF-Dokument",
+        "ext": [
+          "pdf"
+        ],
+        "name": "PDF document",
         "mimeType": "application/pdf",
         "role": "Viewer",
         "rank": "Alternate"
@@ -45,6 +47,39 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true,
+    "publisher": "unfuckedapps",
+    "homepage": "https://github.com/unfuckedapps/ufLabelPrinter",
+    "shortDescription": "Print shipping labels to thermal label printers",
+    "longDescription": "Prints PDF and image labels to Phomemo, Vevor and other TSPL thermal printers over USB and Bluetooth LE, without vendor software.",
+    "linux": {
+      "deb": {
+        "depends": [
+          "bluez"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "bluez"
+        ]
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI3OTIyNzFDMkYwRjM1RjQKUldUME5ROHZIQ2VTdDR1TEpxYUlzalhINXFaQWhnR0pnWVBIQUxlNkpML2ZWWnJSK1RieW1ROEUK",
+      "endpoints": [
+        "https://github.com/unfuckedapps/ufLabelPrinter/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

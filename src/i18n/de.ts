@@ -260,6 +260,13 @@ export const de: Dictionary = {
     io: "Ein-/Ausgabefehler",
     other: "Fehler",
   },
+  update: {
+    available: "Update {version}",
+    title: "Version {version} ist verfügbar",
+    install: "Installieren und neu starten",
+    downloading: "Lade herunter {percent} %",
+    failed: "Update fehlgeschlagen: {error}",
+  },
   toast: {
     close: "Schließen",
   },

@@ -263,6 +263,13 @@ export const fr: Dictionary = {
     io: "Erreur d’entrée/sortie",
     other: "Erreur",
   },
+  update: {
+    available: "Mise à jour {version}",
+    title: "La version {version} est disponible",
+    install: "Installer et redémarrer",
+    downloading: "Téléchargement {percent} %",
+    failed: "Échec de la mise à jour : {error}",
+  },
   toast: {
     close: "Fermer",
   },

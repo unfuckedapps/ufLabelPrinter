@@ -6,6 +6,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { FileDown, Languages, Printer, RefreshCw, ScrollText, Settings2 } from "lucide-react";
 
 import { LANGUAGES, useT, type Language } from "../i18n";
+import { UpdateNotice } from "./UpdateNotice";
 import { takePendingFiles } from "../lib/api";
 import { useConfig } from "../lib/config";
 import { useDocuments } from "../lib/documents";
@@ -185,6 +186,7 @@ export function AppLayout() {
           </Tab>
         </nav>
         <div className="flex-1" />
+        <UpdateNotice />
         <PrinterPicker />
         <LanguagePicker />
       </header>
