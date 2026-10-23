@@ -1,0 +1,22 @@
+{
+  "id": "phomemo-d530-pro",
+  "vendor": "Phomemo",
+  "name": "D530 Pro",
+  "protocol": "tspl",
+  "status": "phomemo",
+  "dpi": 300,
+  "maxWidthMm": 108,
+  "match": {
+    "usb": [{ "vendorId": 11836, "productId": 22361 }],
+    "bluetooth": ["D530Pro", "D530 Pro"]
+  },
+  "defaults": {
+    "widthMm": 101.6,
+    "heightMm": 152.4,
+    "mediaType": "gap",
+    "gapMm": 3
+  },
+  "speeds": [2, 3, 4, 5, 6],
+  "density": { "min": 0, "max": 15 },
+  "notes": "Meldet sich per USB als \"QIN LabelPrinter\". Versteht kein TSPL-<ESC>!?, dafür die SSS-Statusabfragen von Labelife."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "generic-tspl-300",
+  "vendor": "Allgemein",
+  "name": "TSPL-Drucker 300 dpi",
+  "protocol": "tspl",
+  "dpi": 300,
+  "maxWidthMm": 108,
+  "defaults": {
+    "widthMm": 101.6,
+    "heightMm": 152.4,
+    "mediaType": "gap",
+    "gapMm": 3
+  },
+  "speeds": [2, 3, 4, 5, 6],
+  "density": { "min": 0, "max": 15 }
+}

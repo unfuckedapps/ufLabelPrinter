@@ -1,0 +1,20 @@
+{
+  "id": "vevor-y468bt",
+  "vendor": "Vevor",
+  "name": "Y468BT",
+  "protocol": "tspl",
+  "dpi": 203,
+  "maxWidthMm": 108,
+  "match": {
+    "bluetooth": ["Y468BT"]
+  },
+  "defaults": {
+    "widthMm": 101.6,
+    "heightMm": 152.4,
+    "mediaType": "gap",
+    "gapMm": 3
+  },
+  "speeds": [2, 3, 4, 5, 6],
+  "density": { "min": 0, "max": 15 },
+  "notes": "Der Vevor-CUPS-Treiber erzeugt TSPL mit 203 dpi. Statusabfragen sind noch nicht erforscht."
+}
