@@ -1,7 +1,7 @@
 {
   "id": "generic-tspl-300",
-  "vendor": "Allgemein",
-  "name": "TSPL-Drucker 300 dpi",
+  "vendor": "Generic",
+  "name": "TSPL printer 300 dpi",
   "protocol": "tspl",
   "dpi": 300,
   "maxWidthMm": 108,

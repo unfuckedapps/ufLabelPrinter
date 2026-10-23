@@ -58,7 +58,7 @@ pub fn send(queue: &str, data: &[u8]) -> Result<()> {
     child
         .stdin
         .take()
-        .ok_or_else(|| Error::Other("lp stdin nicht verfügbar".into()))?
+        .ok_or_else(|| Error::Other("lp stdin not available".into()))?
         .write_all(data)?;
 
     let output = child.wait_with_output()?;
@@ -66,7 +66,7 @@ pub fn send(queue: &str, data: &[u8]) -> Result<()> {
         Ok(())
     } else {
         Err(Error::Other(format!(
-            "lp ist fehlgeschlagen: {}",
+            "lp failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         )))
     }

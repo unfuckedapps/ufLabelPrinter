@@ -88,7 +88,7 @@ pub fn list_models(app: AppHandle) -> ModelRegistry {
 /// Opens the folder for custom model files in Finder, creating it on first use.
 #[tauri::command]
 pub fn open_models_dir(app: AppHandle) -> Result<()> {
-    let dir = user_models_dir(&app).ok_or_else(|| Error::Other("Kein Konfigurationsordner".into()))?;
+    let dir = user_models_dir(&app).ok_or_else(|| Error::Other("no app config directory".into()))?;
     std::fs::create_dir_all(&dir)?;
     std::process::Command::new("open").arg(&dir).spawn()?;
     Ok(())
@@ -243,16 +243,16 @@ fn parse_job(body: &[u8]) -> Result<(JobMeta, Vec<Page>)> {
     let len_bytes: [u8; 4] = body
         .get(..4)
         .and_then(|b| b.try_into().ok())
-        .ok_or_else(|| invalid("Kopf fehlt"))?;
+        .ok_or_else(|| invalid("missing header"))?;
     let meta_end = 4 + u32::from_le_bytes(len_bytes) as usize;
     let meta: JobMeta =
-        serde_json::from_slice(body.get(4..meta_end).ok_or_else(|| invalid("Metadaten abgeschnitten"))?)?;
+        serde_json::from_slice(body.get(4..meta_end).ok_or_else(|| invalid("truncated metadata"))?)?;
 
     let mut offset = meta_end;
     let mut pages = Vec::with_capacity(meta.pages.len());
     for p in &meta.pages {
         let end = offset + p.width_bytes * p.height;
-        let data = body.get(offset..end).ok_or_else(|| invalid("Bitmap abgeschnitten"))?;
+        let data = body.get(offset..end).ok_or_else(|| invalid("truncated bitmap"))?;
         pages.push(Page {
             width_bytes: p.width_bytes,
             height: p.height,
@@ -262,7 +262,7 @@ fn parse_job(body: &[u8]) -> Result<(JobMeta, Vec<Page>)> {
         offset = end;
     }
     if offset != body.len() {
-        return Err(invalid("überzählige Daten"));
+        return Err(invalid("trailing data"));
     }
     Ok((meta, pages))
 }
@@ -300,7 +300,7 @@ fn progress_reporter(app: AppHandle, job_id: String) -> impl Fn(usize, usize) + 
 #[tauri::command]
 pub async fn print_job(app: AppHandle, request: Request<'_>) -> Result<()> {
     let InvokeBody::Raw(body) = request.body() else {
-        return Err(Error::InvalidJob("Binärdaten erwartet".into()));
+        return Err(Error::InvalidJob("expected a binary request body".into()));
     };
     let (mut meta, pages) = parse_job(body)?;
     let model = model(&app, &meta.model_id)?;
@@ -351,9 +351,7 @@ pub async fn read_document(path: PathBuf) -> Result<Response> {
         .map(str::to_ascii_lowercase)
         .unwrap_or_default();
     if !OPENABLE.contains(&ext.as_str()) {
-        return Err(Error::Other(format!(
-            "Dateityp .{ext} wird nicht unterstützt (PDF, PNG, JPG, WebP)"
-        )));
+        return Err(Error::UnsupportedFile(ext));
     }
     Ok(Response::new(read_file(path).await?))
 }

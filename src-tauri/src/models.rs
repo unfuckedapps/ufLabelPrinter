@@ -92,14 +92,14 @@ impl PrinterModel {
 
     fn validate(&self) -> std::result::Result<(), String> {
         if self.id.trim().is_empty() {
-            return Err("\"id\" darf nicht leer sein".into());
+            return Err("\"id\" must not be empty".into());
         }
         protocol::get(&self.protocol).map_err(|e| e.to_string())?;
         if let Some(dialect) = &self.status {
-            status::get(dialect).ok_or_else(|| format!("unbekannter Status-Dialekt \"{dialect}\""))?;
+            status::get(dialect).ok_or_else(|| format!("unknown status dialect \"{dialect}\""))?;
         }
         if !(100..=1200).contains(&self.dpi) {
-            return Err(format!("unplausible Auflösung {} dpi", self.dpi));
+            return Err(format!("implausible resolution {} dpi", self.dpi));
         }
         Ok(())
     }
@@ -164,7 +164,7 @@ impl ModelRegistry {
         self.models
             .iter()
             .find(|m| m.id == id)
-            .ok_or_else(|| Error::Other(format!("Druckermodell \"{id}\" ist unbekannt")))
+            .ok_or_else(|| Error::UnknownModel(id.to_owned()))
     }
 
     pub fn match_usb(&self, vendor_id: u16, product_id: u16) -> Option<&PrinterModel> {

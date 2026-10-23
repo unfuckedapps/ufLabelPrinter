@@ -41,7 +41,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            // Finder "Öffnen mit" / dropping files on the Dock icon.
+            // Finder "Open With" / dropping files on the Dock icon.
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             if let tauri::RunEvent::Opened { urls } = event {
                 let paths: Vec<_> = urls.iter().filter_map(|u| u.to_file_path().ok()).collect();

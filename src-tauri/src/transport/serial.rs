@@ -50,12 +50,9 @@ fn open(path: &str, timeout: Duration) -> Result<TTYPort> {
     // The baud rate is meaningless for RFCOMM but required by the API.
     let port = TTYPort::open(&serialport::new(path, 115_200).timeout(timeout)).map_err(|err| {
         match err.kind() {
-            serialport::ErrorKind::NoDevice => Error::NotFound(format!(
-                "{path} – ist der Drucker eingeschaltet und gekoppelt? ({err})"
-            )),
-            serialport::ErrorKind::Io(ErrorKind::NotFound) => Error::NotFound(format!(
-                "{path} ist verschwunden – macOS hat die Bluetooth-Verbindung getrennt"
-            )),
+            serialport::ErrorKind::NoDevice | serialport::ErrorKind::Io(ErrorKind::NotFound) => {
+                Error::PortUnavailable { path: path.to_owned() }
+            }
             _ => Error::Other(format!("{path}: {err}")),
         }
     })?;
@@ -89,12 +86,7 @@ pub fn send(path: &str, data: &[u8], progress: &Progress) -> Result<()> {
             Ok(n) => sent += n,
             Err(err) if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::Interrupted => {}
             Err(err) if err.kind() == ErrorKind::TimedOut => {
-                return Err(Error::Timeout(format!(
-                    "Bluetooth-Übertragung hängt seit {}s bei {} von {} KB – Drucker außer Reichweite oder Verbindung getrennt",
-                    STALL_TIMEOUT.as_secs(),
-                    sent / 1024,
-                    data.len() / 1024
-                )));
+                return Err(Error::Stalled { sent, total: data.len() });
             }
             Err(err) => return Err(map_io(err, sent, data.len())),
         }
@@ -122,10 +114,10 @@ pub fn send(path: &str, data: &[u8], progress: &Progress) -> Result<()> {
             last_change = Instant::now();
             progress.report(data.len() - queued, data.len());
         } else if last_change.elapsed() > STALL_TIMEOUT {
-            return Err(Error::Timeout(format!(
-                "Bluetooth-Übertragung hängt, {} KB nicht gesendet – Verbindung getrennt?",
-                queued.div_ceil(1024)
-            )));
+            return Err(Error::Stalled {
+                sent: data.len() - queued,
+                total: data.len(),
+            });
         }
         std::thread::sleep(Duration::from_millis(50));
     }
@@ -174,11 +166,7 @@ pub fn exchange(
 
 fn map_io(err: std::io::Error, sent: usize, total: usize) -> Error {
     if err.kind() == ErrorKind::BrokenPipe {
-        Error::Other(format!(
-            "Bluetooth-Verbindung nach {} von {} KB abgerissen",
-            sent / 1024,
-            total / 1024
-        ))
+        Error::Disconnected { sent, total }
     } else {
         Error::Io(err)
     }

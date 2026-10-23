@@ -48,7 +48,7 @@ fn header(s: &JobSettings) -> String {
 
 fn build_job(settings: &JobSettings, pages: &[Page]) -> Result<Vec<u8>> {
     if pages.is_empty() {
-        return Err(Error::InvalidJob("keine Seiten".into()));
+        return Err(Error::InvalidJob("job has no pages".into()));
     }
 
     let payload: usize = pages.iter().map(|p| p.data.len() + 64).sum();
@@ -68,7 +68,7 @@ fn build_job(settings: &JobSettings, pages: &[Page]) -> Result<Vec<u8>> {
             }
             Compression::Lzo => {
                 let packed = lzokay::compress::compress(&inverted)
-                    .map_err(|e| Error::InvalidJob(format!("LZO-Komprimierung: {e:?}")))?;
+                    .map_err(|e| Error::InvalidJob(format!("LZO compression failed: {e:?}")))?;
                 out.extend_from_slice(
                     format!(
                         "BITMAP 0,0,{},{},3,{},",
@@ -103,7 +103,7 @@ impl Protocol for Tspl {
             Media::Gap { .. } => "GAPDETECT",
             Media::BlackMark { .. } => "BLINEDETECT",
             Media::Continuous => {
-                return Err(Error::Other("Endlospapier muss nicht kalibriert werden".into()));
+                return Err(Error::Other("continuous paper needs no calibration".into()));
             }
         };
         Ok(format!("{}{command}\r\n", header(settings)).into_bytes())

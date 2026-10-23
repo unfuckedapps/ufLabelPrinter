@@ -16,5 +16,5 @@
   },
   "speeds": [2, 3, 4, 5, 6],
   "density": { "min": 0, "max": 15 },
-  "notes": "Der Vevor-CUPS-Treiber erzeugt TSPL mit 203 dpi. Statusabfragen sind noch nicht erforscht."
+  "notes": "The Vevor CUPS driver emits TSPL at 203 dpi. Status queries are not known yet."
 }

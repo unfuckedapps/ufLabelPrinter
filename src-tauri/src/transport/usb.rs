@@ -69,12 +69,12 @@ fn find(sel: &UsbSelector) -> Result<DeviceInfo> {
 
     found.ok_or_else(|| {
         Error::NotFound(format!(
-            "USB-Gerät {:04x}:{:04x}{} ist nicht angeschlossen",
+            "USB device {:04x}:{:04x}{} is not connected",
             sel.vendor_id,
             sel.product_id,
             sel.serial
                 .as_deref()
-                .map(|s| format!(" (Seriennr. {s})"))
+                .map(|s| format!(" (serial {s})"))
                 .unwrap_or_default()
         ))
     })
@@ -90,21 +90,21 @@ impl UsbPrinter {
     pub fn open(sel: &UsbSelector) -> Result<Self> {
         let info = find(sel)?;
         let iface_num = printer_interface(&info)
-            .ok_or_else(|| Error::Usb("Gerät hat keine Drucker-Schnittstelle".into()))?;
+            .ok_or_else(|| Error::Usb("device has no printer interface".into()))?;
 
         let device = info.open().wait()?;
         let interface = device.claim_interface(iface_num).wait()?;
 
         let desc = interface
             .descriptor()
-            .ok_or_else(|| Error::Usb("Schnittstellenbeschreibung fehlt".into()))?;
+            .ok_or_else(|| Error::Usb("interface descriptor missing".into()))?;
         let bulk = |dir: Direction| {
             desc.endpoints()
                 .find(|e| e.transfer_type() == TransferType::Bulk && e.direction() == dir)
                 .map(|e| e.address())
         };
         let out_ep = bulk(Direction::Out)
-            .ok_or_else(|| Error::Usb("Kein Bulk-OUT-Endpunkt gefunden".into()))?;
+            .ok_or_else(|| Error::Usb("no bulk OUT endpoint".into()))?;
         let in_ep = bulk(Direction::In);
 
         Ok(Self { interface, out_ep, in_ep })
@@ -179,7 +179,7 @@ impl UsbPrinter {
 
 fn map_io(err: std::io::Error) -> Error {
     if err.kind() == std::io::ErrorKind::TimedOut {
-        Error::Timeout("Der Drucker hat die Daten nicht angenommen".into())
+        Error::SendTimeout
     } else {
         Error::Io(err)
     }

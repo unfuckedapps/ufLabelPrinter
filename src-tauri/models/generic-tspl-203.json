@@ -1,7 +1,7 @@
 {
   "id": "generic-tspl-203",
-  "vendor": "Allgemein",
-  "name": "TSPL-Drucker 203 dpi",
+  "vendor": "Generic",
+  "name": "TSPL printer 203 dpi",
   "protocol": "tspl",
   "dpi": 203,
   "maxWidthMm": 108,
@@ -13,5 +13,5 @@
   },
   "speeds": [2, 3, 4, 5, 6],
   "density": { "min": 0, "max": 15 },
-  "notes": "Für die meisten günstigen 4-Zoll-Versandetikettendrucker (TSC-kompatibel)."
+  "notes": "Fits most cheap 4 inch shipping label printers (TSC compatible)."
 }

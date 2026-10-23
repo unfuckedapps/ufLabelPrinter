@@ -22,7 +22,7 @@ pub trait Protocol: Send + Sync {
 pub fn get(id: &str) -> Result<&'static dyn Protocol> {
     match id {
         "tspl" => Ok(&tspl::Tspl),
-        other => Err(Error::Other(format!("unbekannte Druckersprache \"{other}\""))),
+        other => Err(Error::Other(format!("unknown printer language \"{other}\""))),
     }
 }
 
@@ -30,7 +30,7 @@ pub fn get(id: &str) -> Result<&'static dyn Protocol> {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Media {
-    /// Die-cut labels with a gap between them (Lückenpapier).
+    /// Die-cut labels with a gap between them.
     Gap { gap_mm: f32, offset_mm: f32 },
     /// Labels separated by a black mark on the back side.
     BlackMark { mark_mm: f32, offset_mm: f32 },
@@ -81,11 +81,11 @@ pub struct Page {
 impl Page {
     pub fn validate(&self) -> Result<()> {
         if self.width_bytes == 0 || self.height == 0 {
-            return Err(Error::InvalidJob("leere Seite".into()));
+            return Err(Error::InvalidJob("empty page".into()));
         }
         if self.data.len() != self.width_bytes * self.height {
             return Err(Error::InvalidJob(format!(
-                "Bitmap hat {} Bytes, erwartet {}",
+                "bitmap has {} bytes, expected {}",
                 self.data.len(),
                 self.width_bytes * self.height
             )));
