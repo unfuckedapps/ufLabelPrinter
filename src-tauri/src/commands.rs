@@ -441,7 +441,10 @@ pub async fn read_document(path: PathBuf) -> Result<Response> {
     if !OPENABLE.contains(&ext.as_str()) {
         return Err(Error::UnsupportedFile(ext));
     }
-    Ok(Response::new(read_file(path).await?))
+    let bytes = read_file(path.clone())
+        .await
+        .inspect_err(|err| log::warn!("cannot read {}: {err}", path.display()))?;
+    Ok(Response::new(bytes))
 }
 
 async fn read_file(path: PathBuf) -> Result<Vec<u8>> {

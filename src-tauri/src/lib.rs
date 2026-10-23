@@ -16,10 +16,14 @@ use models::ModelRegistry;
 /// Hands files from "Open With" / file associations to the UI, which drains the queue on
 /// this signal and once on startup.
 fn open_files(app: &AppHandle, paths: impl IntoIterator<Item = PathBuf>) {
-    let paths: Vec<_> = paths.into_iter().filter(|p| p.is_file()).collect();
+    let (paths, skipped): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| p.is_file());
+    if !skipped.is_empty() {
+        log::warn!("cannot open, not a file: {skipped:?}");
+    }
     if paths.is_empty() {
         return;
     }
+    log::info!("opened from outside the app: {paths:?}");
     app.state::<PendingFiles>()
         .0
         .lock()
