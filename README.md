@@ -2,6 +2,13 @@
 
 **Unfuck your thermal label printer.**
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+    <img src="docs/screenshot-light.png" alt="ufLabelPrinter with a shipping label scaled to a 4 × 6 inch label, ready to print" width="900">
+  </picture>
+</p>
+
 Cheap thermal label printers are great hardware wrapped in terrible software: apps that
 want an account before printing a single label, drivers that crop your shipping label in
 half, and a different app for every printer you own.
