@@ -26,6 +26,7 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .level_for("thermalprinter_lib", log::LevelFilter::Debug)
                 .level_for("btleplug", log::LevelFilter::Debug)
+                .level_for("nusb", log::LevelFilter::Warn)
                 .max_file_size(2_000_000)
                 .build(),
         )

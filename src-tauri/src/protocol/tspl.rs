@@ -108,8 +108,10 @@ impl Protocol for Tspl {
         build_job(settings, pages)
     }
 
+    /// An empty label rather than `FORMFEED`, which not every firmware knows (the Vevor
+    /// Y468BT ignores it); a blank `PRINT` feeds exactly one label on all of them.
     fn feed(&self, settings: &JobSettings) -> Result<Vec<u8>> {
-        Ok(format!("{}FORMFEED\r\n", header(settings)).into_bytes())
+        Ok(format!("{}CLS\r\nPRINT 1,1\r\n", header(settings)).into_bytes())
     }
 
     /// Feeds a few labels while the sensor measures them.
@@ -270,6 +272,13 @@ mod tests {
         assert_eq!(&job[at..at + 2], b"\r\n");
         assert_eq!(unpacked.len(), data.len());
         assert!(unpacked.iter().zip(&data).all(|(u, d)| *u == !d));
+    }
+
+    #[test]
+    fn feeds_with_a_blank_label() {
+        let feed = String::from_utf8(Tspl.feed(&settings(Media::Continuous)).unwrap()).unwrap();
+        assert!(feed.ends_with("CLS\r\nPRINT 1,1\r\n"));
+        assert!(!feed.contains("FORMFEED"));
     }
 
     #[test]
